@@ -3,6 +3,8 @@ import io
 import os
 import csv
 import sys
+import uuid
+import json
 import queue
 import shutil
 import tarfile
@@ -92,7 +94,7 @@ def read_docx_tables(f):
   with contextlib.redirect_stderr(_DevNull()):
     doc = Document(f)
   for i, tab in enumerate(doc.tables):
-    yield str(i), _read_docx_tab(tab)
+    yield dict(label=str(i), df=_read_docx_tab(tab))
 
 @register_ext_handler('.docx')
 def prepare_docx(fr):
@@ -126,7 +128,7 @@ def read_excel_tables(f, engine=None):
   ''' Use pandas read_excel function for these files, return all tables from all sheets
   '''
   for sheet, df in pd.read_excel(f, sheet_name=None, engine=engine).items():
-    yield sheet, df
+    yield dict(label=sheet, df=df)
 
 @register_ext_handler('.xlsx')
 def read_xlsx_tables(f):
@@ -134,17 +136,17 @@ def read_xlsx_tables(f):
 
 @register_ext_handler('.csv')
 def read_csv_tables(f):
-  yield '', pd.read_csv(f)
+  yield dict(df=pd.read_csv(f))
 
 @register_ext_handler('.tsv')
 def read_tsv_tables(f):
-  yield '', pd.read_csv(f, sep='\t')
+  yield dict(df=pd.read_csv(f, sep='\t'))
 
 @register_ext_handler('.txt')
 def read_txt_tables(f):
   ''' Try to read txt as a table using pandas infer functionality
   '''
-  yield '', pd.read_csv(f, sep=None, engine='python')
+  yield dict(df=pd.read_csv(f, sep=None, engine='python'))
 
 def _read_xml_text(node):
   ''' Read the text from an xml node (or the text from all it's children)
@@ -153,6 +155,21 @@ def _read_xml_text(node):
     el.text
     for el in node.findall('.//')
   )))
+
+def _read_xml_text_with_exclusion(node, exclude={'table-wrap', 'fig'}):
+  ''' Read the text from an xml node (or the text from all it's children)
+  '''
+  Q = [node]
+  while Q:
+    node = Q.pop(0)
+    if node.text:
+      yield node
+    else:
+      Q += [
+        el
+        for el in node
+        if el.tag not in exclude
+      ]
 
 def _read_xml_table(tbl):
   ''' This reads a xml table as a pandas dataframe
@@ -169,18 +186,33 @@ def _read_xml_table(tbl):
   )
   return df
 
-@register_ext_handler('.nxml', '.xml')
-def read_xml_tables(f):
+def _read_xml_tables(root):
   ''' Tables are embedded in the xml files, they can be parsed 
   '''
-  parsed = ET.parse(f)
-  root = parsed.getroot()
-  for tblWrap in root.findall('.//table-wrap'):
+  for i, tblWrap in enumerate(root.findall('.//table-wrap'), start=1):
+    # find the table label
     label = tblWrap.find('./label')
     if label:
       label = _read_xml_text(label)
+
+    # find the table caption
+    caption = tblWrap.find('./caption')
+    if caption:
+      caption = _read_xml_text(caption)
+
+    # find any mention of the table in the article
+    ref = tblWrap.attrib.get('id')
+    if ref:
+      href = f"#{ref}"
+      mentions = '\n'.join(
+        ''.join(_read_xml_text_with_exclusion(mention))
+        for mention in root.findall(f'.//xref[rid="{ref}"]/..')
+      )
     else:
-      label = ''
+      href = None
+      mentions = None
+
+    # get the table itself
     tbl = tblWrap.find('./table')
     if tbl and tbl.find('./thead') and tbl.find('./tbody'):
       try:
@@ -189,8 +221,50 @@ def read_xml_tables(f):
         raise
       except:
         traceback.print_exc()
-      else:
-        yield label, tbl
+        continue
+      #
+      yield dict(type='table', href=href, df=tbl)
+      yield dict(type='context', href=href, label=label, caption=caption, mentions=mentions)
+
+def _read_xml_supplemental_context(root):
+  ''' Tables are embedded in the xml files, they can be parsed 
+  '''
+  for supplementary_material in root.findAll('.//supplementary-material'):
+    # find the supplemental material href
+    media = root.find('./media')
+    if not media: continue
+    href = media.attrib['xlink:href']
+
+    # find the supplemental material caption
+    caption = media.find('./caption')
+    if caption:
+      caption = _read_xml_text(caption)
+
+    # find any mention of the table in the article
+    ref = supplementary_material.attrib.get('id')
+    if ref:
+      mentions = '\n'.join(
+        ''.join(_read_xml_text_with_exclusion(mention))
+        for mention in root.findall(f'.//xref[rid="{ref}"]/..')
+      )
+    else:
+      mentions = None
+
+    yield dict(
+      type='context',
+      href=href,
+      caption=caption,
+      mentions=mentions,
+    )
+
+@register_ext_handler('.nxml', '.xml')
+def read_xml(f):
+  ''' Tables are embedded in the xml files, they can be parsed 
+  '''
+  parsed = ET.parse(f)
+  root = parsed.getroot()
+  yield from _read_xml_tables(root)
+  yield from _read_xml_supplemental_context(root)
 
 # it's unclear whether this really gives us any new information, and it is extremely expensive to compute
 #  so for now I'm leaving it out.
@@ -208,22 +282,6 @@ def read_xml_tables(f):
 #   else:
 #     raise NotImplementedError()
 
-def extract_tables_from_oa_package(oa_package):
-  ''' Given a oa_package (open access bundle with paper & figures) extract all applicable tables
-  '''
-  with tarfile.open(oa_package) as tar:
-    for member in tar.getmembers():
-      if member.isfile():
-        handler = ext_handlers.get(PurePosixPath(member.name).suffix.lower())
-        if handler:
-          try:
-            for k, tbl in handler(tar.extractfile(member)):
-              yield (member.name, k, tbl)
-          except KeyboardInterrupt:
-            raise
-          except:
-            traceback.print_exc()
-
 lookup = None
 def gene_lookup(value):
   ''' Don't allow pure numbers or spaces--numbers can typically match entrez ids
@@ -236,32 +294,54 @@ def gene_lookup(value):
     lookup = ncbi_genes_lookup(filters=lambda ncbi: ncbi)
   return lookup(value)
 
-def extract_geneset_columns(df):
+def extract_gene_set_columns(df):
   ''' Given a pandas dataframe, find columns containing mostly mappable genes
   '''
-  for col in df.columns:
-    if df[col].dtype != np.dtype('O'): continue
-    unique_genes = pd.Series(df[col].dropna().unique())
+  for column in df.columns:
+    if df[column].dtype != np.dtype('O'): continue
+    unique_genes = pd.Series(df[column].dropna().unique())
     if unique_genes.shape[0] >= 5:
       unique_genes_mapped = unique_genes.apply(gene_lookup).dropna()
       ratio = unique_genes_mapped.shape[0] / unique_genes.shape[0]
       if ratio > 0.5:
-        yield col, unique_genes.apply(lambda gene: re.sub(r'\s+', ' ', gene) if type(gene) == str else gene).tolist()
+        yield dict(
+          column=column,
+          raw_genes=unique_genes.apply(lambda gene: re.sub(r'\s+', ' ', gene) if type(gene) == str else gene).tolist(),
+          mapped_genes=unique_genes_mapped.tolist(),
+        ) 
 
 def slugify(s):
   ''' Replace non-characters/numbers with _
   '''
   return re.sub(r'[^\w\d-]+', '_', s).strip('_')
 
-def extract_gmt_from_oa_package(oa_package):
-  ''' Create a GMT from an oa_package archive
+def extract_tables_from_oa_package(oa_package):
+  ''' Load all the tables from an oa_package archive
   '''
-  genesets = {}
-  for member_name, table, df in extract_tables_from_oa_package(oa_package):
-    member_name_path = PurePosixPath(member_name)
-    for col, geneset in extract_geneset_columns(df):
-      genesets[f"{member_name_path.parent.name}-{member_name_path.name}-{slugify(table)}-{slugify(col)}"] = geneset
-  return genesets
+  with tarfile.open(oa_package) as tar:
+    for member in tar.getmembers():
+      if member.isfile():
+        member_name_path = PurePosixPath(member.name)
+        handler = ext_handlers.get(member_name_path.suffix.lower())
+        if handler:
+          try:
+            for info in enumerate(handler(tar.extractfile(member))):
+              yield dict(member_name_path=str(member_name_path), **info)
+          except KeyboardInterrupt:
+            raise
+          except:
+            traceback.print_exc()
+
+def extract_oa_package(oa_package):
+  for info in extract_tables_from_oa_package(oa_package):
+    table_id = uuid.uuid4()
+    df = info.pop('df')
+    if df:
+      yield dict(type='table', id=table_id, **info)
+      for column in extract_gene_set_columns(df):
+        yield dict(type='column', table_id=table_id, **column)
+    else:
+      yield dict(type='paper', id=oa_package, **info)
 
 def fetch_oa_file_list(data_dir = Path()):
   ''' Fetch the PMCID, PMID, oa_file listing; we sort it newest first.
@@ -306,29 +386,29 @@ def filter_oa_file_list_by(oa_file_list, pmc_ids):
   '''
   return oa_file_list[oa_file_list['Accession ID'].isin(list(pmc_ids))]
 
-def fetch_extract_gmt_from_oa_package(oa_package):
-  ''' Given the oa_package name from the oa_file_list, we'll download it temporarily and then extract a gmt out of it
+def fetch_extract_oa_package(oa_package):
+  ''' Given the oa_package name from the oa_file_list, we'll download it temporarily and then extract tables/columns out of it
   '''
   with tempfile.NamedTemporaryFile(suffix=''.join(PurePosixPath(oa_package).suffixes)) as tmp:
     with urllib.request.urlopen(f"https://ftp.ncbi.nlm.nih.gov/pub/pmc/{oa_package}") as fr:
       shutil.copyfileobj(fr, tmp)
     tmp.flush()
-    return extract_gmt_from_oa_package(tmp.name)
+    return list(extract_oa_package(tmp.name))
 
 def task(record):
   try:
-    return record, None, run_with_timeout(fetch_extract_gmt_from_oa_package, record['File'], timeout=60*5)
+    return record, None, run_with_timeout(fetch_extract_oa_package, record['File'], timeout=60*5)
   except KeyboardInterrupt:
     raise
   except:
     return record, traceback.format_exc(), None
 
-def main(data_dir = Path(), oa_file_list = None, progress = 'done.txt', progress_output = 'done.new.txt', output = 'output.gmt'):
+def main(data_dir = Path(), oa_file_list = None, progress = 'done.txt', progress_output = 'done.new.txt', output = 'output.jsonl'):
   '''
   Work through oa_file_list (see: fetch_oa_file_list)
     -- you can filter it and provide it to this function
   Track progress by storing oa_packages already processed in done.txt
-  Write all results to output.gmt
+  Write all results to output.jsonl
   '''
   data_dir.mkdir(parents=True, exist_ok=True)
   done_file = data_dir / progress
@@ -349,12 +429,12 @@ def main(data_dir = Path(), oa_file_list = None, progress = 'done.txt', progress
   oa_file_list_size = oa_file_list.shape[0]
   oa_file_list = oa_file_list[~oa_file_list['File'].isin(list(done))]
 
-  # fetch and extract gmts from oa_packages using a process pool
-  #  append gmt term, genesets as they are ready into one gmt file
+  # fetch and extract oa_packages using a process pool
+  #  append extracted records as they are ready into one jsonl file
   with new_done_file.open('a') as done_file_fh:
     with output_file.open('a') as output_fh:
       with ThreadPool() as pool:
-        for record, err, res in tqdm.tqdm(
+        for record, error, res in tqdm.tqdm(
           pool.imap_unordered(
             task,
             (row for _, row in oa_file_list.iterrows())
@@ -362,17 +442,11 @@ def main(data_dir = Path(), oa_file_list = None, progress = 'done.txt', progress
           initial=oa_file_list_size - oa_file_list.shape[0],
           total=oa_file_list_size
         ):
-          if err is None:
-            for term, geneset in res.items():
-              print(
-                term,
-                '',
-                *geneset,
-                sep='\t',
-                file=output_fh,
-              )
+          if error is None:
+            for record in res:
+              print(json.dumps(record), file=output_fh)
           else:
-            print(err, file=sys.stderr)
+            print(json.dumps(dict(type='error', error=error)), file=sys.stderr)
           print(record['File'], file=done_file_fh)
           output_fh.flush()
           done_file_fh.flush()
