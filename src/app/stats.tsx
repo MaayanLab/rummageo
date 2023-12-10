@@ -20,7 +20,7 @@ export default function Stats({
   const { data } = useStatsQuery({ pollInterval: 60000 })
 
   if (show_human_gene_sets) {
-    return (data?.humanGeneSets?.totalCount !== undefined && show_human_gene_sets) ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.humanGeneSets.totalCount)}</span>&nbsp;human gene sets</> : <span className='loading'>loading</span>
+    return (data?.humanGeneSets?.totalCount !== undefined && show_human_gene_sets) ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.humanGeneSets.totalCount)}</span>&nbsp;human</> : <span className='loading'>loading</span>
   } else if (show_mouse_gene_sets) {
     return (data?.mouseGeneSets?.totalCount !== undefined && show_mouse_gene_sets) ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.mouseGeneSets.totalCount)}</span>&nbsp;mouse gene sets</> : <span className='loading'>loading</span>
   } else if (show_total_gene_sets) {

@@ -29,7 +29,7 @@ function TermSearchResults({ terms }: { terms: string }) {
   return (
     <div className="flex flex-col gap-2 my-2">
       <h2 className="text-md font-bold">
-        After rummaging through <Stats show_total_gene_sets />. Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found your search term in the table titles of {data.geneSetTermSearch?.totalCount} gene sets.
+        After rummaging through <Stats show_total_gene_sets />. Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found your search term in the the title and condition descriptions of {data.geneSetTermSearch?.totalCount} gene sets.
       </h2>
       {data.geneSetTermSearch?.nodes && data.geneSetTermSearch?.nodes.length > 0 ? <TermTable terms={data?.geneSetTermSearch?.nodes}></TermTable> : null}
     </div>
@@ -110,7 +110,7 @@ export default function TermSearchPage() {
             type="submit"
             className="btn normal-case"
           >Search gene sets</button>
-        <div> Query extracted gene set table titles to find relevant gene sets.</div>
+        <div> Query extracted gene set titles to find relevant gene sets.</div>
         </form>
         <p className="prose p-2">
           try an example:&nbsp;
