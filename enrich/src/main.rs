@@ -214,7 +214,7 @@ async fn get_gmt(
     ensure_index(&mut db, &state, background_id).await.map_err(|e| Custom(Status::InternalServerError, e.to_string()))?;
     let bitmap = state.bitmaps.get_read(&background_id).await.ok_or(Custom(Status::InternalServerError, String::from("Can't find background")))?;
     Ok(TextStream! {
-        for (_row_id, row_str, title, gene_set) in bitmap.values.iter() {
+        for (_row_id, row_str, _title, gene_set) in bitmap.values.iter() {
             let mut line = String::new();
             line.push_str(row_str);
             line.push_str("\t");
