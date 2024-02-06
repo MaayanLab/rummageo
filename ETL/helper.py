@@ -140,6 +140,39 @@ def import_gene_set_library(
     desc='Inserting new genesets...'),
   )
 
+def import_gse_attrs(plpy, species='human'):
+  import json
+  from tqdm import tqdm
+
+  to_ingest = [
+    r['gse']
+    for r in plpy.cursor(
+      f'''
+        select gse, species
+        from app_public_v2.gse_info
+        where species = '{species}'
+      '''
+    )
+  ]
+
+  to_ingest = list(set(to_ingest))
+  
+  with open(f'data/gse_attrs_clean_{species}_v3.json') as f:
+    gse_attrs = json.load(f)
+  
+  with open(f'data/gse_processed_meta_{species}_conf.json') as f:
+    gse_conf = json.load(f)
+
+  for gse in tqdm(to_ingest):
+      sql = """
+      UPDATE app_public_v2.gse_info
+      SET gse_attrs = %s, silhouette_score = %s
+      WHERE gse = %s;
+      """
+      gse_attrs_json = json.dumps(gse_attrs[gse])
+      silhouette_score = gse_conf[gse]['silhouette_score']
+      plpy.execute(sql, (gse_attrs_json, silhouette_score, gse))
+
 
 
 def import_gse_info(plpy, species='human'):
@@ -408,6 +441,18 @@ def ingest_gse_info(species):
   from plpy import plpy
   try:
     import_gse_info(plpy, species)
+  except:
+    plpy.conn.rollback()
+    raise
+  else:
+    plpy.conn.commit()
+
+@cli.command()
+@click.option('--species', type=str, default='human', help='Terms species')
+def ingest_gse_attrs(species):
+  from plpy import plpy
+  try:
+    import_gse_attrs(plpy, species)
   except:
     plpy.conn.rollback()
     raise

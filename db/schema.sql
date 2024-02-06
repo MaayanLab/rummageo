@@ -349,19 +349,6 @@ $$;
 
 
 --
--- Name: gene_set_term_search(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
---
-
-CREATE FUNCTION app_public_v2.gene_set_term_search(terms character varying[]) RETURNS SETOF app_public_v2.gene_set
-    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
-    AS $$
-  select distinct gs.*
-  from app_public_v2.gene_set gs
-  inner join unnest(terms) ut(term) on gs.term ilike ('%' || ut.term || '%');
-$$;
-
-
---
 -- Name: gse_info; Type: TABLE; Schema: app_public_v2; Owner: -
 --
 
@@ -374,20 +361,117 @@ CREATE TABLE app_public_v2.gse_info (
     published_date date,
     species character varying,
     platform character varying,
-    sample_groups jsonb
+    sample_groups jsonb,
+    gse_attrs jsonb,
+    silhouette_score double precision
 );
+
+
+--
+-- Name: gene_set_pmid; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.gene_set_pmid AS
+ SELECT gs.id,
+    gs.term,
+    gse_info.id AS gse_id,
+    gse_info.gse,
+    gse_info.pmid,
+    gse_info.title,
+    gse_info.sample_groups,
+    gse_info.platform,
+    gse_info.published_date,
+    gse_info.gse_attrs,
+    gse_info.silhouette_score
+   FROM (app_public_v2.gene_set gs
+     JOIN app_public_v2.gse_info gse_info ON ((regexp_replace((gs.term)::text, '\mGSE([^-]+)\M.*'::text, 'GSE\1'::text) = (gse_info.gse)::text)))
+  WITH NO DATA;
+
+
+--
+-- Name: MATERIALIZED VIEW gene_set_pmid; Type: COMMENT; Schema: app_public_v2; Owner: -
+--
+
+COMMENT ON MATERIALIZED VIEW app_public_v2.gene_set_pmid IS '@foreignKey (id) references app_public_v2.gene_set (id)';
+
+
+--
+-- Name: gene_set_term_search(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.gene_set_term_search(terms character varying[]) RETURNS SETOF app_public_v2.gene_set_pmid
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select distinct gs.*
+  from app_public_v2.gene_set_pmid gs
+  inner join unnest(terms) ut(term) on gs.title ilike ('%' || ut.term || '%');
+$$;
+
+
+--
+-- Name: gsm_meta; Type: TABLE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TABLE app_public_v2.gsm_meta (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    gsm character varying NOT NULL,
+    gse character varying,
+    title character varying,
+    characteristics_ch1 character varying,
+    source_name_ch1 character varying
+);
+
+
+--
+-- Name: get_gsm_meta(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.get_gsm_meta(gsms character varying[]) RETURNS SETOF app_public_v2.gsm_meta
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select *
+  from app_public_v2.gsm_meta
+  where gsm = ANY (gsms);
+$$;
 
 
 --
 -- Name: get_pb_info_by_ids(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
-CREATE FUNCTION app_public_v2.get_pb_info_by_ids(pmids character varying[]) RETURNS SETOF app_public_v2.gse_info
+CREATE FUNCTION app_public_v2.get_pb_info_by_ids(pmids character varying[]) RETURNS SETOF app_public_v2.gene_set_pmid
     LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
     AS $$
   select *
-  from app_public_v2.gse_info
-  where pmid = ANY (pmids);
+  from app_public_v2.gene_set_pmid
+  where pmid = ANY(pmids)
+$$;
+
+
+--
+-- Name: pmid_info; Type: TABLE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TABLE app_public_v2.pmid_info (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    pmid character varying NOT NULL,
+    pmcid character varying,
+    title character varying,
+    pub_date character varying,
+    doi character varying
+);
+
+
+--
+-- Name: get_pb_meta_by_ids(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.get_pb_meta_by_ids(pmids character varying[]) RETURNS SETOF app_public_v2.pmid_info
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select *
+  from app_public_v2.pmid_info
+  where pmid = ANY(pmids)
 $$;
 
 
@@ -533,43 +617,6 @@ COMMENT ON MATERIALIZED VIEW app_public_v2.gene_set_gse IS '@foreignKey (id) ref
 
 
 --
--- Name: gene_set_pmid; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
---
-
-CREATE MATERIALIZED VIEW app_public_v2.gene_set_pmid AS
- SELECT gs.id,
-    gse_info.id AS gse_id,
-    gse_info.gse,
-    gse_info.pmid
-   FROM (app_public_v2.gene_set gs
-     JOIN app_public_v2.gse_info gse_info ON ((regexp_replace((gs.term)::text, '^(^GSE\d+)(.*)$'::text, '\1'::text) = (gse_info.gse)::text)))
-  WITH NO DATA;
-
-
---
--- Name: MATERIALIZED VIEW gene_set_pmid; Type: COMMENT; Schema: app_public_v2; Owner: -
---
-
-COMMENT ON MATERIALIZED VIEW app_public_v2.gene_set_pmid IS '@foreignKey (id) references app_public_v2.gene_set (id)';
-
-
---
--- Name: gene_set_gse_info; Type: VIEW; Schema: app_public_v2; Owner: -
---
-
-CREATE VIEW app_public_v2.gene_set_gse_info AS
- SELECT gsp.id,
-    gsp.gse_id,
-    gse_info.gse,
-    gse_info.title,
-    gse_info.sample_groups,
-    gse_info.platform,
-    gse_info.published_date
-   FROM (app_public_v2.gene_set_pmid gsp
-     JOIN app_public_v2.gse_info gse_info ON (((gsp.gse)::text = (gse_info.gse)::text)));
-
-
---
 -- Name: gene_set_pmc; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
@@ -604,20 +651,6 @@ COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2
 
 
 --
--- Name: gsm_meta; Type: TABLE; Schema: app_public_v2; Owner: -
---
-
-CREATE TABLE app_public_v2.gsm_meta (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    gsm character varying NOT NULL,
-    gse character varying,
-    title character varying,
-    characteristics_ch1 character varying,
-    source_name_ch1 character varying
-);
-
-
---
 -- Name: pmc; Type: VIEW; Schema: app_public_v2; Owner: -
 --
 
@@ -631,36 +664,6 @@ CREATE VIEW app_public_v2.pmc AS
 --
 
 COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2.gene_set_pmc (pmc)';
-
-
---
--- Name: pmid; Type: VIEW; Schema: app_public_v2; Owner: -
---
-
-CREATE VIEW app_public_v2.pmid AS
- SELECT DISTINCT gene_set_pmid.pmid
-   FROM app_public_v2.gene_set_pmid;
-
-
---
--- Name: VIEW pmid; Type: COMMENT; Schema: app_public_v2; Owner: -
---
-
-COMMENT ON VIEW app_public_v2.pmid IS '@foreignKey (pmid) references app_public_v2.gene_set_pmid (pmid)';
-
-
---
--- Name: pmid_info; Type: TABLE; Schema: app_public_v2; Owner: -
---
-
-CREATE TABLE app_public_v2.pmid_info (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    pmid character varying NOT NULL,
-    pmcid character varying,
-    title character varying,
-    yr integer,
-    doi character varying
-);
 
 
 --
@@ -877,6 +880,27 @@ CREATE INDEX gene_synonyms_idx ON app_public_v2.gene USING gin (synonyms);
 
 
 --
+-- Name: idx_gene_set_species; Type: INDEX; Schema: app_public_v2; Owner: -
+--
+
+CREATE INDEX idx_gene_set_species ON app_public_v2.gene_set USING btree (species);
+
+
+--
+-- Name: idx_gsm_meta_gsm; Type: INDEX; Schema: app_public_v2; Owner: -
+--
+
+CREATE INDEX idx_gsm_meta_gsm ON app_public_v2.gsm_meta USING btree (gsm);
+
+
+--
+-- Name: pmid_info_pmid_idx; Type: INDEX; Schema: app_public_v2; Owner: -
+--
+
+CREATE INDEX pmid_info_pmid_idx ON app_public_v2.pmid_info USING btree (pmid);
+
+
+--
 -- Name: release_created_idx; Type: INDEX; Schema: app_public_v2; Owner: -
 --
 
@@ -921,4 +945,7 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20231205200001'),
     ('20231205220323'),
     ('20231206002401'),
-    ('20231206165544');
+    ('20231206165544'),
+    ('20231207235614'),
+    ('20240202144258'),
+    ('20240202163120');

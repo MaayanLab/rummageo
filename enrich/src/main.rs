@@ -154,17 +154,18 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
         }
 
         // compute the index in memory
-        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id where gs.species = '{}';", species).as_str())
+        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title, gp.silhouette_score from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id where gs.species = '{}';", species).as_str())
             .fetch(&mut **db)
             .for_each(|row| {
                 let row = row.unwrap();
                 let gene_set_id: uuid::Uuid = row.try_get("id").unwrap();
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
+                let silhouette_score: f64 = row.try_get("silhouette_score").unwrap();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
                 let bitset = bitvec(&bitmap.columns, gene_ids);
-                bitmap.values.push((gene_set_id, term, title, bitset));
+                bitmap.values.push((gene_set_id, term, title, silhouette_score, bitset));
                 future::ready(())
             })
             .await;

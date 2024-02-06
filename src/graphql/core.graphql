@@ -48,6 +48,8 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
               platform
               publishedDate
               title
+              gseAttrs
+              silhouetteScore
             }
           }
         }
