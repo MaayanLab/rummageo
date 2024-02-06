@@ -74,7 +74,7 @@ function PubMedSearchResults({ search }: { search: string }) {
           ? <>Since there are more than 5,000 papers that match your query, we only display {Intl.NumberFormat("en-US", {}).format(gene_set_ids.size)} gene sets associated with {Intl.NumberFormat("en-US", {}).format(pmid_terms.size)} publications asscociated with gene sets from the first 5,000 publications returned from your query. Please narrow your search to obtain better results.</>
           : <>Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found {Intl.NumberFormat("en-US", {}).format(gene_set_ids.size)} gene sets associated with {Intl.NumberFormat("en-US", {}).format(pmid_terms.size)} publications returned from your query.</>}
       </h2>
-      <PmidSearchColumns pmid_terms={pmid_terms} pmids={pmidsInDb} gene_set_ids={gene_set_ids}></PmidSearchColumns>
+      <PmidSearchColumns pmid_terms={pmid_terms} pmids={pmidsInDb} gene_set_ids={gene_set_ids} filterTerm={search}></PmidSearchColumns>
     </div>
   )
 }

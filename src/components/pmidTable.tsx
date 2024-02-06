@@ -7,18 +7,21 @@ import blobTsv from '@/utils/blobTsv';
 import clientDownloadBlob from '@/utils/clientDownloadBlob';
 import partition from '@/utils/partition';
 import SamplesModal from './samplesModal';
+import { FaSearch } from "react-icons/fa";
+import { TiDeleteOutline } from "react-icons/ti"
+import { MdOutlineFileDownload } from "react-icons/md"
 
 const pageSize = 10
 
 
-export default function PmidTable({ terms, data, gene_set_ids }: {
+export default function PmidTable({ terms, data, gene_set_ids, filterTerm }: {
   terms?: Map<string, string[]>, data?: {
     __typename?: "PmidInfo" | undefined;
     pmid: string;
     pubDate?: string | null | undefined;
     title?: string | null | undefined;
     doi?: string | null | undefined;
-  }[], gene_set_ids?: Map<string, [any, number, any]>
+  }[], gene_set_ids?: Map<string, [any, number, any]>, filterTerm: string
 }) {
   const [queryString, setQueryString] = useQsState({ page: '1', f: '' })
   const { page, searchTerm } = React.useMemo(() => ({ page: queryString.page ? +queryString.page : 1, searchTerm: queryString.f ?? '' }), [queryString])
@@ -47,7 +50,7 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
       <SamplesModal samples={modalSamples} condition={modalCondition} showModal={showConditionsModal} setShowModal={setShowConditionsModal}></SamplesModal>
       <div className='m-5 mt-1'>
         <div className='join flex flex-row place-content-end items-center pt-3 pr-3'>
-          <span className="label-text text-base">Search:&nbsp;</span>
+          <span className="label-text text-base mr-2">Search:&nbsp;</span>
           <input
             type="text"
             className="input input-bordered"
@@ -59,22 +62,22 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
           <div className="tooltip" data-tip="Search results">
             <button
               type="submit"
-              className="btn join-item"
-            >&#x1F50D;</button>
+              className="btn join-item bg-transparent ml-2"
+            ><FaSearch /></button>
           </div>
           <div className="tooltip" data-tip="Clear search">
             <button
               type="reset"
-              className="btn join-item"
+              className="btn join-item bg-transparent"
               onClick={evt => {
                 setQueryString({ page: '1', f: '' })
               }}
-            >&#x232B;</button>
+            ><TiDeleteOutline /></button>
           </div>
           <div className="tooltip" data-tip="Download results">
             <button
               type="button"
-              className="btn join-item font-bold text-2xl pb-1"
+              className="btn join-item font-bold text-2xl pb-1 bg-transparent"
               onClick={evt => {
                 if (!dataFiltered) return
                 const blob = blobTsv(['pmcid', 'title', 'year', 'doi', 'terms'], dataFiltered, item => {
@@ -94,7 +97,7 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
                 }})
                 clientDownloadBlob(blob, 'results.tsv')
               }}
-            >&#x21E9;</button>
+            ><MdOutlineFileDownload /></button>
           </div>
         </div>
         <table className="table table-xs">
@@ -118,7 +121,14 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
                         target="_blank"
                         rel="noreferrer"
                       >{el?.pmid}</a></td>
-                    <td>{el?.title}</td>
+                    <td>{el?.title
+                      ? el.title.split(filterTerm).map((part, i) => (
+                          <>
+                            {i > 0 && <b>{filterTerm}</b>}
+                            {part}
+                          </>
+                        ))
+                      : ""}</td>
                     <td>{el?.pubDate}</td>
                     <td>{terms?.get(el?.pmid)?.length}</td>
                     <td className='align-text-middle'>
@@ -136,6 +146,8 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
                   {terms?.get(el?.pmid)?.map(term => {
                     const sample_groups = gene_set_ids?.get(term)?.at(2)
                     const [gse, cond1, _, cond2, species, dir] = partition(term)
+                    const cond1Title: string = sample_groups?.titles[cond1] || ''
+                    const cond2Title: string = sample_groups?.titles[cond2] || ''
                     return (
                       <tr key={term} id={term} className='hidden bg-white dark:bg-black bg-opacity-30'>
                         <td colSpan={1}>{gse.includes(',') ? <>
@@ -165,7 +177,14 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
                         setModalCondition(sample_groups?.titles[cond1])
                         setShowConditionsModal(true)
                       }}
-                    >{sample_groups?.titles[cond1]}</label>
+                    >{cond1Title
+                      ? cond1Title.split(filterTerm).map((part: string, i: number) => (
+                          <>
+                            {i > 0 && <b>{filterTerm}</b>}
+                            {part}
+                          </>
+                        ))
+                      : ""}</label>
                         </td>
                         <td colSpan={1}><label
                       htmlFor="geneSetModal"
@@ -175,7 +194,15 @@ export default function PmidTable({ terms, data, gene_set_ids }: {
                         setModalCondition(sample_groups?.titles[cond2])
                         setShowConditionsModal(true)
                       }}
-                    >{sample_groups?.titles[cond2]}</label></td>
+                    >{cond2Title
+                        ? cond2Title.split(filterTerm).map((part: string, i: number) => (
+                            <>
+                              {i > 0 && <b>{filterTerm}</b>}
+                              {part}
+                            </>
+                          ))
+                        : ""}
+                    </label></td>
                     <td colSpan={1}>{dir}</td>
                     <td colSpan={1}>{species.replace('.tsv', '')}</td>
                         <td colSpan={1}>

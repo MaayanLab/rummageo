@@ -18,6 +18,9 @@ import Image from 'next/image'
 import GeneSetModal from '@/components/geneSetModal'
 import SamplesModal from '@/components/samplesModal'
 import partition from '@/utils/partition'
+import { FaSearch } from "react-icons/fa";
+import { TiDeleteOutline } from "react-icons/ti"
+import { MdOutlineFileDownload } from "react-icons/md"
 
 const pageSize = 8
 
@@ -72,31 +75,31 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
       >
         <input
           type="text"
-          className="input input-bordered join-item"
+          className="input input-bordered bg-transparent join-item"
           value={rawTerm}
           onChange={evt => { setRawTerm(evt.currentTarget.value) }}
         />
         <div className="tooltip" data-tip="Search results">
           <button
             type="submit"
-            className="btn join-item"
-          >&#x1F50D;</button>
+            className="btn join-item bg-transparent ml-2"
+          ><FaSearch /></button>
         </div>
         <div className="tooltip" data-tip="Clear search">
           <button
             type="reset"
-            className="btn join-item"
+            className="btn join-item bg-transparent"
             onClick={evt => {
               setQueryString({ page: '1', q: '' })
             }}
-          >&#x232B;</button>
+          ><TiDeleteOutline /></button>
         </div>
         <a href={`/enrich/download?dataset=${queryString.dataset}&q=${queryString.q}`} download="results.tsv">
           <div className="tooltip" data-tip="Download results">
             <button
               type="button"
-              className="btn join-item font-bold text-2xl pb-1"
-            >&#x21E9;</button>
+              className="btn join-item font-bold text-2xl pb-1 bg-transparent"
+            ><MdOutlineFileDownload /></button>
           </div>
         </a>
       </form>
@@ -117,6 +120,7 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
               <th>Odds</th>
               <th>PValue</th>
               <th>AdjPValue</th>
+              <th>Silhouette Score</th>
             </tr>
           </thead>
           <tbody>
@@ -141,9 +145,9 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
               const cond2Title = enrichmentResult.geneSet?.geneSetPmidsById?.nodes[0]?.sampleGroups?.titles[cond2] ?? ''
               const cond1Samples = enrichmentResult.geneSet?.geneSetPmidsById?.nodes[0]?.sampleGroups?.samples[cond1] ?? ''
               const cond2Samples = enrichmentResult.geneSet?.geneSetPmidsById?.nodes[0]?.sampleGroups?.samples[cond2] ?? ''
-
+              console.log(enrichmentResult)
               return (
-                <tr key={j}>
+                <tr key={j} className='text-center'>
                   <th>
                     {gse.includes(',') ? <>
                       {gse.split(',').map((g, i) => {
@@ -184,8 +188,8 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
                         rel="noreferrer"
                       >{pmid}</a> : <>N/A</>}
                   </th>
-                  <td>{enrichmentResult?.geneSet?.geneSetPmidsById?.nodes[0]?.title ?? ''}</td>
-                  <td>
+                  <td className='text-left'>{enrichmentResult?.geneSet?.geneSetPmidsById?.nodes[0]?.title ?? ''}</td>
+                  <td className='text-left'>
                   <label
                       htmlFor="geneSetModal"
                       className="prose underline cursor-pointer"
@@ -195,7 +199,7 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
                       }}
                     >{cond1Title}</label>
                   </td>
-                  <td>
+                  <td className='text-left'>
                     <label
                       htmlFor="geneSetModal"
                       className="prose underline cursor-pointer"
@@ -261,6 +265,7 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
                   <td className="whitespace-nowrap">{enrichmentResult?.oddsRatio?.toPrecision(3)}</td>
                   <td className="whitespace-nowrap">{enrichmentResult?.pvalue?.toPrecision(3)}</td>
                   <td className="whitespace-nowrap">{enrichmentResult?.adjPvalue?.toPrecision(3)}</td>
+                  <td className="whitespace-nowrap">{enrichmentResult?.geneSet?.geneSetPmidsById?.nodes[0]?.silhouetteScore?.toPrecision(2) ?? ''}</td>
                 </tr>
               )
             })}

@@ -4,8 +4,8 @@ import { useSuspenseQuery } from '@apollo/client';
 import PmidTable from './pmidTable';
 import Loading from './loading';
 
-export default function PmidSearchData({ pmid_terms, pmids, gene_set_ids}: 
-  { pmid_terms?: Map<string, string[]>, pmids?: (string | null | undefined)[], gene_set_ids?: Map<string, [any, number, any]>}) {
+export default function PmidSearchData({ pmid_terms, pmids, gene_set_ids, filterTerm}: 
+  { pmid_terms?: Map<string, string[]>, pmids?: (string | null | undefined)[], gene_set_ids?: Map<string, [any, number, any]>, filterTerm: string}) {
 
   const { data: pmcMeta } = useSuspenseQuery<GetPmidInfoQuery>(GetPmidInfoDocument, {
     variables: { pmids: pmids },
@@ -16,7 +16,7 @@ export default function PmidSearchData({ pmid_terms, pmids, gene_set_ids}:
 
   return (
     <React.Suspense fallback={<Loading/>}>
-      <PmidTable data={pmcMeta.getPbMetaByIds?.nodes} terms={pmid_terms} gene_set_ids={gene_set_ids}></PmidTable>
+      <PmidTable data={pmcMeta.getPbMetaByIds?.nodes} terms={pmid_terms} gene_set_ids={gene_set_ids} filterTerm={filterTerm}></PmidTable>
     </React.Suspense>
   )
 }
