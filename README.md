@@ -1,4 +1,4 @@
-# Rummagene
+# RummaGEO
 
 <https://rummageo.com/>
 

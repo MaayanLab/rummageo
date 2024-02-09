@@ -25,7 +25,7 @@ const robotoMono = Roboto_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Rummageo',
+  title: 'RummaGEO',
   description: 'Search through automatically generated signatures from GEO',
 }
 
@@ -63,7 +63,7 @@ export default function RootLayout({
                 <ul>
                   <li><Link href="mailto:avi.maayan@mssm.edu" target="_blank">Contact Us</Link></li>
                   <li>
-                    <Link href="https://github.com/MaayanLab/rummagene/tree/rummageo" target="_blank" rel="noopener noreferrer">
+                    <Link href="https://github.com/MaayanLab/rummageo" target="_blank" rel="noopener noreferrer">
                       Source Code
                     </Link>
                   </li>

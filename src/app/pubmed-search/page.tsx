@@ -66,13 +66,13 @@ function PubMedSearchResults({ search }: { search: string }) {
   if (error) return <div className="text-center p-5"><div className="text-center"><Image className={'rounded mx-auto'} src={'/images/loading.gif'} width={250} height={250} alt={'Loading...'} /> </div>Failed to fetch articles from PubMed... trying again in a few seconds.</div>
   if (isLoading) return <Loading/>
   if (!pbData?.esearchresult?.idlist || !pmidsInDb) return null
-  if (pmidsInDb.length < 1) return <div className="text-center p-5">Your query returned {Intl.NumberFormat("en-US", {}).format(pmidCount)} articles, but none of first 5000 articles are associated with gene sets in the Rummageo database. Please try refining your query.</div>
+  if (pmidsInDb.length < 1) return <div className="text-center p-5">Your query returned {Intl.NumberFormat("en-US", {}).format(pmidCount)} articles, but none of first 5000 articles are associated with gene sets in the RummaGEO database. Please try refining your query.</div>
   return (
     <div className="flex flex-col gap-2 my-2">
       <h2 className="text-md font-bold">
         Your query returned {Intl.NumberFormat("en-US", {}).format(pmidCount)} articles from PubMed. {pmidCount > 5000
           ? <>Since there are more than 5,000 papers that match your query, we only display {Intl.NumberFormat("en-US", {}).format(gene_set_ids.size)} gene sets associated with {Intl.NumberFormat("en-US", {}).format(pmid_terms.size)} publications asscociated with gene sets from the first 5,000 publications returned from your query. Please narrow your search to obtain better results.</>
-          : <>Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found {Intl.NumberFormat("en-US", {}).format(gene_set_ids.size)} gene sets associated with {Intl.NumberFormat("en-US", {}).format(pmid_terms.size)} publications returned from your query.</>}
+          : <>RummaGEO <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found {Intl.NumberFormat("en-US", {}).format(gene_set_ids.size)} gene sets associated with {Intl.NumberFormat("en-US", {}).format(pmid_terms.size)} publications returned from your query.</>}
       </h2>
       <PmidSearchColumns pmid_terms={pmid_terms} pmids={pmidsInDb} gene_set_ids={gene_set_ids} filterTerm={search}></PmidSearchColumns>
     </div>

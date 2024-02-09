@@ -64,7 +64,7 @@ function EnrichmentResults({ userGeneSet, setModalGeneSet, setModalSamples, setM
       <h2 className="text-md font-bold">
         {!enrichmentResults?.background?.enrich ?
           <>Rummaging through {species =="human" ? <><Stats  show_human_gene_sets /> gene sets</>: <Stats  show_mouse_gene_sets />} </>
-          : <>After rummaging through {species =="human" ? <Stats  show_human_gene_sets /> : <Stats  show_mouse_gene_sets />} gene sets. Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found {Intl.NumberFormat("en-US", {}).format(enrichmentResults?.background?.enrich?.totalCount || 0)} statistically significant matches.</>}
+          : <>After rummaging through {species =="human" ? <Stats  show_human_gene_sets /> : <Stats  show_mouse_gene_sets />} gene sets. RummaGEO <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found {Intl.NumberFormat("en-US", {}).format(enrichmentResults?.background?.enrich?.totalCount || 0)} statistically significant matches.</>}
       </h2>
       <form
         className="join flex flex-row place-content-end place-items-center"

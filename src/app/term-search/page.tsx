@@ -30,7 +30,7 @@ function TermSearchResults({ terms }: { terms: string }) {
   return (
     <div className="flex flex-col gap-2 my-2">
       <h2 className="text-md font-bold">
-        After rummaging through <Stats show_total_gene_sets />. Rummageo <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found your search term in the the title and condition descriptions of {data.geneSetTermSearch?.totalCount} gene sets.
+        After rummaging through <Stats show_total_gene_sets />. RummaGEO <Image className="inline-block rounded" src="/images/rummageo_logo.png" width={50} height={100} alt="Rummageo"></Image> found your search term in the the title and condition descriptions of {data.geneSetTermSearch?.totalCount} gene sets.
       </h2>
       {data.geneSetTermSearch?.nodes && data.geneSetTermSearch?.nodes.length > 0 ? <TermTable terms={data?.geneSetTermSearch?.nodes} filterTerm={terms}></TermTable> : null}
     </div>

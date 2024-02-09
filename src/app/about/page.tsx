@@ -8,18 +8,18 @@ export default function About() {
       <h2 className="title text-xl font-medium mb-3">Abstract</h2>
       <div className="flex">
         <div className="flex-col">
-        <Image className={'rounded float-right ml-5'} src={'/images/rummageo_logo.png'} width={250} height={250} alt={'Rummagene'}></Image>
+        <Image className={'rounded float-right ml-5'} src={'/images/rummageo_logo.png'} width={250} height={250} alt={'Rummageo'}></Image>
           <p className="text-justify">
             The Gene Expression Omnibus (GEO) is a major open biomedical research repository for transcriptomics and other omics datasets. 
             It currently contains millions of gene expression samples from tens of thousands of studies collected by many 
             biomedical research laboratories from around the world. While users of the GEO repository can search the metadata 
             describing studies and samples for locating relevant studies, there is currently no method or resource that facilitates
-            global search of GEO at the data level. To address this shortcoming, we developed Rummageo, a webserver application that 
+            global search of GEO at the data level. To address this shortcoming, we developed RummaGEO, a webserver application that 
             enables gene expression signature search against all human and mouse RNA-seq studies deposited into GEO. To enable such a 
             search engine, we performed offline automatic identification of conditions from uniformly aligned GEO studies available from
             ARCHS4, and then computed differential expression signatures to extract gene sets from these signatures. In total, 
-            Rummageo currently contains <Stats show_human_gene_sets bold/> and <Stats show_mouse_gene_sets bold/> from <Stats show_gses bold/>. Overall,
-            Rummagene provides an unprecedented resource for the biomedical research community enabling hypotheses generation 
+            RummaGEO currently contains <Stats show_human_gene_sets bold/> and <Stats show_mouse_gene_sets bold/> from <Stats show_gses bold/>. Overall,
+            RummaGEO provides an unprecedented resource for the biomedical research community enabling hypotheses generation 
             for many future studies.
           </p>
           <h2 className="title text-xl font-medium mb-3 mt-3">Methods</h2>
@@ -46,7 +46,7 @@ export default function About() {
           </p>
           <br />
           <>
-          Rummagene is actively being developed by <a className='underline cursor' href="https://labs.icahn.mssm.edu/maayanlab/">the Ma&apos;ayan Lab</a>
+          Reummageo is actively being developed by <a className='underline cursor' href="https://labs.icahn.mssm.edu/maayanlab/">the Ma&apos;ayan Lab</a>
           </>
         </div>
        
