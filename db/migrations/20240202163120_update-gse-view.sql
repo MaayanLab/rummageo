@@ -22,15 +22,33 @@ from
 join
     app_public_v2.gse_info gse_info ON regexp_replace(gs.term, '\mGSE([^-]+)\M.*', 'GSE\1') = gse_info.gse;
 
--- Add a comment for the foreign key
+
 comment on materialized view app_public_v2.gene_set_pmid is E'@foreignKey (id) references app_public_v2.gene_set (id)';
 
--- Create unique and regular indexes
 create index gene_set_pmid_id_idx on app_public_v2.gene_set_pmid (id);
 create index gene_set_pmid_pmid_idx on app_public_v2.gene_set_pmid (pmid);
 
--- Grant permissions
 grant select on app_public_v2.gene_set_pmid to guest;
 grant all privileges on app_public_v2.gene_set_pmid to authenticated;
+
+
+create function app_public_v2.get_pb_info_by_ids(pmids varchar[])
+returns setof app_public_v2.gene_set_pmid as
+$$
+  select *
+  from app_public_v2.gene_set_pmid
+  where pmid = ANY(pmids)
+$$ language sql immutable strict parallel safe;
+grant execute on function app_public_v2.get_pb_info_by_ids to guest, authenticated;
+
+create or replace function app_public_v2.gene_set_term_search(terms varchar[]) returns setof app_public_v2.gene_set_pmid
+as $$
+  select distinct gs.*
+  from app_public_v2.gene_set_pmid gs
+  inner join unnest(terms) ut(term) on gs.title ilike ('%' || ut.term || '%');
+$$ language sql immutable strict parallel safe;
+grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
+
 -- migrate:down
 
+drop materialized view if exists app_public_v2.gene_set_pmid cascade;
