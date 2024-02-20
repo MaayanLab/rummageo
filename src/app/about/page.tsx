@@ -46,7 +46,7 @@ export default function About() {
           </p>
           <br />
           <>
-          Reummageo is actively being developed by <a className='underline cursor' href="https://labs.icahn.mssm.edu/maayanlab/">the Ma&apos;ayan Lab</a>
+          ReummaGEO is actively being developed by <a className='underline cursor' href="https://labs.icahn.mssm.edu/maayanlab/">the Ma&apos;ayan Lab</a>
           </>
         </div>
        

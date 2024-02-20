@@ -14,7 +14,7 @@ export default function HomeLayout({ children }: React.PropsWithChildren<{}>) {
         </div>
         <div className="text-center p-10">
           <h2 className="text-2xl font-bold p-2">
-            Rummageo
+            RummaGEO
           </h2>
           <div className='inline-flex'>
             <Image className={'rounded'} src={'/images/rummageo_logo.png'} width={225} height={225} alt={'Rummageo'}></Image>

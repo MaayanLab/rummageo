@@ -33,7 +33,11 @@ export default function Nav() {
           href="/about"
           className={classNames({ 'active': pathname === '/about' })}
           shallow>About</Link></li>
-
+      <li>
+        <Link
+          href="/documentation"
+          className={classNames({ 'active': pathname === '/documentation' })}
+          shallow>Documentation</Link></li>
     </>
   )
 }
