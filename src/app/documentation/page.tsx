@@ -143,7 +143,7 @@ export default function Documentation() {
             1.1 Gene Set Search
           </h2>
           <p>
-          The Gene Set Search page enables users to search the RummaGEO database for gene sets that match their query gene set. Similarity to gene sets contained within the RummaGEO database with the query gene set is measured with Fisher's exact test. Any significantly overlapping gene sets are returned to the user along with their accompanying metadata. User query gene sets can be pasted or typed into the input form with each gene on a new line, or the user may upload a file containing genes where the genes are listed with new line, tab, or comma separators. Based on the gene symbols within the query gene set, this query will run against either the collection of automatically generated human gene sets or mouse gene sets:
+          The Gene Set Search page enables users to search the RummaGEO database for gene sets that match their query gene set. Similarity to gene sets contained within the RummaGEO database with the query gene set is measured with Fisher&apos;s exact test. Any significantly overlapping gene sets are returned to the user along with their accompanying metadata. User query gene sets can be pasted or typed into the input form with each gene on a new line, or the user may upload a file containing genes where the genes are listed with new line, tab, or comma separators. Based on the gene symbols within the query gene set, this query will run against either the collection of automatically generated human gene sets or mouse gene sets:
 
           </p>
           <Image
@@ -210,7 +210,7 @@ export default function Documentation() {
             1.2 PubMed Search
           </h2>
           <p>
-          The PubMed Search page enables users to search for gene sets in RummaGEO based on a PubMed search using the PubMed API query. The top 5000 publications returned from the user's query are used to display extracted gene sets from the GEO studies associated with the returned papers. The number of articles returned by the PubMed API along with the number of associated gene sets and associated publications in the RummaGEO database are displayed at the top of the result:
+          The PubMed Search page enables users to search for gene sets in RummaGEO based on a PubMed search using the PubMed API query. The top 5000 publications returned from the user&apos;s query are used to display extracted gene sets from the GEO studies associated with the returned papers. The number of articles returned by the PubMed API along with the number of associated gene sets and associated publications in the RummaGEO database are displayed at the top of the result:
           </p>
           <Image
             src="/images/pubmed-search-1.png"
