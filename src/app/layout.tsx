@@ -7,8 +7,13 @@ import Nav from './nav'
 import Stats from './stats'
 import Image from 'next/image'
 import { RuntimeConfig } from '@/app/runtimeConfig'
-import Analytics from '@/app/analytics'
 import { Open_Sans, Roboto_Mono } from 'next/font/google'
+
+import dynamic from "next/dynamic";
+
+const ConsentCookie = dynamic(() => import("@/components/consentCookie"), {
+  ssr: false,
+});
 
 const openSans = Open_Sans({
   subsets: ['latin'],
@@ -93,8 +98,8 @@ export default function RootLayout({
                 </ul>
               </div> 
             </footer>
+            <ConsentCookie />
           </body>
-          <Analytics />
         </RuntimeConfig>
       </ApolloWrapper>
     </html>
