@@ -3,7 +3,7 @@ services:
   rummageo-app:
     platform: linux/amd64
     build: .
-    image: maayanlab/rummageo:0.0.4
+    image: maayanlab/rummageo:0.0.5
     environment:
       - DATABASE_URL=$DATABASE_URL
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
