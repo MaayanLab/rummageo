@@ -78,6 +78,17 @@ export default function About() {
           </p>
           <br></br>
           <p>
+            For for information about using RummaGEO, please refer to the {" "}
+            <Link
+              href="/usermanual"
+              className="underline cursor-pointer"
+            >
+              User Manual
+            </Link>
+            .
+          </p>
+          <br />
+          <p>
             This database is updated with new releases of{" "}
             <Link
               href="https://maayanlab.cloud/archs4/index.html"
@@ -101,15 +112,16 @@ export default function About() {
             .
           </p>
           <br />
-          <>
+          <p>
             ReummaGEO is actively being developed by{" "}
-            <a
+            <Link
               className="underline cursor"
               href="https://labs.icahn.mssm.edu/maayanlab/"
+              target="_blank"
             >
               the Ma&apos;ayan Lab
-            </a>
-          </>
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -70,7 +70,7 @@ def enrich_rummageo(geneset: list):
         return res
 `;
 
-export default function Documentation() {
+export default function UserManual() {
   return (
     <div className="prose">
       <div className="flex">
