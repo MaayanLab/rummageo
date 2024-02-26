@@ -169,9 +169,11 @@ def import_gse_attrs(plpy, species='human'):
       SET gse_attrs = %s, silhouette_score = %s
       WHERE gse = %s;
       """
-      gse_attrs_json = json.dumps(gse_attrs[gse])
+      all_attrs = []
+      for k in gse_attrs[gse]:
+        all_attrs += gse_attrs[gse][k]
       silhouette_score = gse_conf[gse]['silhouette_score']
-      plpy.execute(sql, (gse_attrs_json, silhouette_score, gse))
+      plpy.execute(sql, (all_attrs, silhouette_score, gse))
 
 
 
