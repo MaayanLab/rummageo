@@ -167,6 +167,13 @@ function EnrichmentResults({
           </>
         )}
       </h2>
+      {!enrichmentResults?.background?.enrich ? (
+                <tr>
+                  <td colSpan={7}>
+                    <Loading />
+                  </td>
+                </tr>
+              ) : null}
       {tab == 1 ? <>
         <form
           className="join flex flex-row place-content-end place-items-center"
@@ -234,13 +241,7 @@ function EnrichmentResults({
               </tr>
             </thead>
             <tbody>
-              {!enrichmentResults?.background?.enrich ? (
-                <tr>
-                  <td colSpan={7}>
-                    <Loading />
-                  </td>
-                </tr>
-              ) : null}
+              
               {enrichmentResults?.background?.enrich?.nodes?.map(
                 (enrichmentResult, j) => {
                   if (!enrichmentResult?.geneSet) return null;
