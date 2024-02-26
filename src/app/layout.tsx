@@ -10,6 +10,7 @@ import { RuntimeConfig } from '@/app/runtimeConfig'
 import { Open_Sans, Roboto_Mono } from 'next/font/google'
 
 import dynamic from "next/dynamic";
+import Analytics from './analytics'
 
 const ConsentCookie = dynamic(() => import("@/components/consentCookie"), {
   ssr: false,
@@ -98,7 +99,7 @@ export default function RootLayout({
                 </ul>
               </div> 
             </footer>
-            <ConsentCookie />
+            <Analytics />
           </body>
         </RuntimeConfig>
       </ApolloWrapper>
