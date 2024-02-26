@@ -1,7 +1,7 @@
 -- migrate:up
 create type app_public_v2.paginated_enrich_result as (
   nodes app_public_v2.enrich_result[],
-  total_count int
+  total_count int,
 );
 
 create or replace function app_private_v2.indexed_enrich(

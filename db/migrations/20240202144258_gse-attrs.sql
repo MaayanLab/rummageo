@@ -1,10 +1,8 @@
 -- migrate:up
 
 alter table app_public_v2.gse_info
-add column gse_attrs jsonb,
+add column gse_attrs varchar[],
 add column silhouette_score float;
-
-
 
 
 -- migrate:down

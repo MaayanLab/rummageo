@@ -37,8 +37,9 @@ struct Postgres(sqlx::PgPool);
 struct Bitmap {
     columns: HashMap<Uuid, u32>,
     columns_str: Vec<String>,
-    values: Vec<(Uuid, String, String, FnvHashSet<u32>)>,
+    values: Vec<(Uuid, String, String, f64, FnvHashSet<u32>)>,
 }
+
 
 impl Bitmap {
     fn new() -> Self {
@@ -106,17 +107,22 @@ struct QueryResult {
 struct QueryResponse {
     results: Vec<QueryResult>,
     content_range: (usize, usize, usize),
+    terms: Vec<String>,
 }
 
 #[rocket::async_trait]
 impl<'r> Responder<'r, 'static> for QueryResponse {
     fn respond_to(self, _: &'r Request<'_>) -> response::Result<'static> {
-        let json = rocket::serde::json::serde_json::to_string(&self.results).unwrap();
+        let mut json = rocket::serde::json::serde_json::json!({
+            "results": &self.results,
+            "terms": &self.terms
+        });
+        let json_str = rocket::serde::json::serde_json::to_string(&json).unwrap();
         Response::build()
             .header(ContentType::JSON)
             .raw_header("Range-Unit", "items")
             .raw_header("Content-Range", format!("{}-{}/{}", self.content_range.0, self.content_range.1, self.content_range.2))
-            .sized_body(json.len(), Cursor::new(json))
+            .sized_body(json_str.len(), Cursor::new(json_str))
             .ok()
     }
 }
@@ -161,7 +167,7 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let gene_set_id: uuid::Uuid = row.try_get("id").unwrap();
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
-                let silhouette_score: f64 = row.try_get("silhouette_score").unwrap();
+                let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
                 let bitset = bitvec(&bitmap.columns, gene_ids);
@@ -215,7 +221,7 @@ async fn get_gmt(
     ensure_index(&mut db, &state, background_id).await.map_err(|e| Custom(Status::InternalServerError, e.to_string()))?;
     let bitmap = state.bitmaps.get_read(&background_id).await.ok_or(Custom(Status::InternalServerError, String::from("Can't find background")))?;
     Ok(TextStream! {
-        for (_row_id, row_str, _title, gene_set) in bitmap.values.iter() {
+        for (_row_id, row_str, _title, _silhouette_score, gene_set) in bitmap.values.iter() {
             let mut line = String::new();
             line.push_str(row_str);
             line.push_str("\t");
@@ -254,7 +260,7 @@ async fn delete(
 // query a specific background_id, providing the bitset vector as input
 //  the result are the gene_set_ids & relevant metrics
 // this can be pretty fast since the index is saved in memory and the overlaps can be computed in parallel
-#[post("/<background_id>?<filter_term>&<overlap_ge>&<pvalue_le>&<adj_pvalue_le>&<offset>&<limit>", data = "<input_gene_set>")]
+#[post("/<background_id>?<filter_term>&<overlap_ge>&<pvalue_le>&<adj_pvalue_le>&<offset>&<limit>&<score_filter>", data = "<input_gene_set>")]
 async fn query(
     mut db: Connection<Postgres>,
     state: &State<PersistentState>,
@@ -266,6 +272,7 @@ async fn query(
     adj_pvalue_le: Option<f64>,
     offset: Option<usize>,
     limit: Option<usize>,
+    score_filter: Option<f64>
 ) -> Result<QueryResponse, Custom<String>> {
     let background_id = {
         if background_id == "latest" {
@@ -295,7 +302,7 @@ async fn query(
             let n_user_gene_id = background_query.input_gene_set.len() as u32;
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
-                .filter_map(|(index, (_row_id, _row_str, _title_str, gene_set))| {
+                .filter_map(|(index, (_row_id, _row_str, _title_str, _silhouette_score, gene_set))| {
                     let n_overlap = gene_set.intersection(&background_query.input_gene_set).count() as u32;
                     if n_overlap < overlap_ge {
                         return None
@@ -336,13 +343,17 @@ async fn query(
             results
         }
     };
+    let mut all_enriched_terms: Vec<String> = Vec::new();
     let mut results: Vec<_> = results
         .iter()
         .filter_map(|result| {
-            let (gene_set_id, gene_set_term, title, _gene_set) = bitmap.values.get(result.index)?;
+            let (gene_set_id, gene_set_term, title, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
             if let Some(filter_term) = &filter_term {
                 if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) { return None }
+            } else if let Some(score_filter) = &score_filter {
+                if silhouette_score < score_filter { return None }
             }
+            all_enriched_terms.push(gene_set_term.clone());
             Some(QueryResult {
                 gene_set_id: gene_set_id.to_string(),
                 n_overlap: result.n_overlap,
@@ -353,6 +364,7 @@ async fn query(
         })
         .collect();
     let range_total = results.len();
+
     let (range_start, range_end) = match (offset.unwrap_or(0), limit) {
         (0, None) => (0, range_total),
         (offset, None) => {
@@ -374,6 +386,7 @@ async fn query(
     Ok(QueryResponse {
         results,
         content_range: (range_start, range_end, range_total),
+        terms: all_enriched_terms,
     })
 }
 

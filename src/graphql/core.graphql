@@ -55,6 +55,13 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
         }
       }
       totalCount
+      enrichedTerms {
+        adjPvalue
+        count
+        pvalue
+        oddsRatio
+        term
+      }
     }
   }
 }
