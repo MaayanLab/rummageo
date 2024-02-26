@@ -93,13 +93,93 @@ COMMENT ON TYPE app_public_v2.enrich_result IS '@foreign key (gene_set_id) refer
 
 
 --
+-- Name: enriched_term_result; Type: TYPE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TYPE app_public_v2.enriched_term_result AS (
+	term character varying,
+	count integer,
+	odds_ratio double precision,
+	pvalue double precision,
+	adj_pvalue double precision
+);
+
+
+--
 -- Name: paginated_enrich_result; Type: TYPE; Schema: app_public_v2; Owner: -
 --
 
 CREATE TYPE app_public_v2.paginated_enrich_result AS (
 	nodes app_public_v2.enrich_result[],
-	total_count integer
+	total_count integer,
+	enriched_terms app_public_v2.enriched_term_result[]
 );
+
+
+--
+-- Name: enrich_functional_terms(character varying[], bigint); Type: FUNCTION; Schema: app_private_v2; Owner: -
+--
+
+CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], total_count bigint) RETURNS app_public_v2.enriched_term_result[]
+    LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
+    AS $$
+    from scipy.stats import fisher_exact
+    from statsmodels.stats.multitest import multipletests
+    from collections import Counter
+
+    term_counter = Counter(concat_terms)
+    term_counts = list(term_counter.items())
+    total_enrich_term_count = sum(term_counter.values())
+
+    results = []
+    p_values = []
+    for term, count in term_counts:
+        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.gse_attrs_term_counts WHERE term = '{term}'")
+        total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
+        contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count]]
+        odds_ratio, p_value = fisher_exact(contingency_table)
+        p_values.append(p_value)
+        results.append({
+            'term': term,
+            'count': count,
+            'odds_ratio': odds_ratio,
+            'pvalue': p_value
+        })
+    try:
+        adjusted_p_values = multipletests(p_values, method='fdr_bh')[1]
+        for i in range(len(results)):
+            results[i]['adj_pvalue'] = adjusted_p_values[i]
+    except Exception as e:
+        for i in range(len(results)):
+            results[i]['adj_pvalue'] = 1
+    results = list(sorted(filter(lambda r: r['adj_pvalue'] < .05, results), key=lambda r: r['adj_pvalue']))
+    return results
+$$;
+
+
+--
+-- Name: enriched_functional_terms(character varying[]); Type: FUNCTION; Schema: app_private_v2; Owner: -
+--
+
+CREATE FUNCTION app_private_v2.enriched_functional_terms(enriched_terms character varying[]) RETURNS app_public_v2.enriched_term_result[]
+    LANGUAGE sql IMMUTABLE SECURITY DEFINER PARALLEL SAFE
+    AS $$
+    with gse_ids as (
+        -- Split enriched_terms vector to get GSE ids
+        select regexp_replace(t, '\mGSE([^-]+)\M.*', 'GSE\1') as id
+        from unnest(enriched_terms) as t
+    ), gse_terms as (
+    -- Get list of functional terms called gse_attrs from app_public_v2.gse_info table
+        select array_agg(terms) as terms
+        from (
+            select unnest(gse_attrs) as terms
+            from app_public_v2.gse_info
+            where gse in (select id from gse_ids)
+        ) subquery
+    )
+    -- Call the enrich_functional_terms function
+    select * from app_private_v2.enrich_functional_terms((select terms from gse_terms), (select total_terms from app_public_v2.gse_attrs_terms_count));
+$$;
 
 
 SET default_tablespace = '';
@@ -120,41 +200,19 @@ CREATE TABLE app_public_v2.background (
 
 
 --
--- Name: indexed_enrich(app_public_v2.background, uuid[], integer, double precision, double precision, integer, integer); Type: FUNCTION; Schema: app_private_v2; Owner: -
+-- Name: indexed_enrich(app_public_v2.background, uuid[], character varying, integer, double precision, double precision, integer, integer, double precision); Type: FUNCTION; Schema: app_private_v2; Owner: -
 --
 
-CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT 0, first integer DEFAULT 100) RETURNS app_public_v2.paginated_enrich_result
-    LANGUAGE plpython3u IMMUTABLE STRICT PARALLEL SAFE
-    AS $$
-  import requests
-  req = requests.post(
-    f"http://rummageo-enrich:8000/{background['id']}",
-    params=dict(
-      overlap_ge=overlap_ge,
-      pvalue_le=pvalue_le,
-      adj_pvalue_le=adj_pvalue_le,
-      offset=offset,
-      limit=first,
-    ),
-    json=gene_ids,
-  )
-  total_count = req.headers.get('Content-Range').partition('/')[-1]
-  return dict(nodes=req.json(), total_count=total_count)
-$$;
-
-
---
--- Name: indexed_enrich(app_public_v2.background, uuid[], character varying, integer, double precision, double precision, integer, integer); Type: FUNCTION; Schema: app_private_v2; Owner: -
---
-
-CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer) RETURNS app_public_v2.paginated_enrich_result
+CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer) RETURNS app_public_v2.paginated_enrich_result
     LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
     AS $$
   import requests
+  import json
   params = dict(
     overlap_ge=overlap_ge,
     pvalue_le=pvalue_le,
     adj_pvalue_le=adj_pvalue_le,
+    filter_score=filter_score_le
   )
   if filter_term: params['filter_term'] = filter_term
   if offset: params['offset'] = offset
@@ -165,7 +223,11 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
     json=gene_ids,
   )
   total_count = req.headers.get('Content-Range').partition('/')[-1]
-  return dict(nodes=req.json(), total_count=total_count)
+  req_json = req.json()
+  enriched_terms = req_json.pop('terms')
+  enriched_terms = ','.join(f"'{item}'" for item in enriched_terms)
+  enriched_terms_result = plpy.execute(f"SELECT app_private_v2.enriched_functional_terms(ARRAY[{enriched_terms}::varchar])")[0]['enriched_functional_terms']
+  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_result)
 $$;
 
 
@@ -200,10 +262,10 @@ $$;
 
 
 --
--- Name: background_enrich(app_public_v2.background, character varying[], character varying, integer, double precision, double precision, integer, integer); Type: FUNCTION; Schema: app_public_v2; Owner: -
+-- Name: background_enrich(app_public_v2.background, character varying[], character varying, integer, double precision, double precision, integer, integer, double precision); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
-CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.background, genes character varying[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer) RETURNS app_public_v2.paginated_enrich_result
+CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.background, genes character varying[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer) RETURNS app_public_v2.paginated_enrich_result
     LANGUAGE sql IMMUTABLE SECURITY DEFINER PARALLEL SAFE
     AS $$
   select r.*
@@ -215,7 +277,8 @@ CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.backgro
     background_enrich.pvalue_le,
     background_enrich.adj_pvalue_le,
     background_enrich."offset",
-    background_enrich."first"
+    background_enrich."first",
+    background_enrich.filter_score_le
   ) r;
 $$;
 
@@ -362,8 +425,8 @@ CREATE TABLE app_public_v2.gse_info (
     species character varying,
     platform character varying,
     sample_groups jsonb,
-    gse_attrs jsonb,
-    silhouette_score double precision
+    silhouette_score double precision,
+    gse_attrs character varying[]
 );
 
 
@@ -648,6 +711,30 @@ CREATE VIEW app_public_v2.gse AS
 --
 
 COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2.gene_set_gse (gse)';
+
+
+--
+-- Name: gse_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_term_counts AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_info.gse_attrs) AS elts
+           FROM app_public_v2.gse_info) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
+
+
+--
+-- Name: gse_attrs_terms_count; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_terms_count AS
+ SELECT count(subquery.elts) AS total_terms
+   FROM ( SELECT unnest(gse_info.gse_attrs) AS elts
+           FROM app_public_v2.gse_info) subquery
+  WITH NO DATA;
 
 
 --
@@ -948,4 +1035,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20231206165544'),
     ('20231207235614'),
     ('20240202144258'),
-    ('20240202163120');
+    ('20240202163120'),
+    ('20240222152523');

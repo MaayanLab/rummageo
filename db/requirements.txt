@@ -1,1 +1,3 @@
 requests
+scipy
+statsmodels
