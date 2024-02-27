@@ -101,7 +101,10 @@ CREATE TYPE app_public_v2.enriched_term_result AS (
 	count integer,
 	odds_ratio double precision,
 	pvalue double precision,
-	adj_pvalue double precision
+	adj_pvalue double precision,
+	not_term_count integer,
+	total_term_count integer,
+	total_not_term_count integer
 );
 
 
@@ -136,14 +139,17 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
     for term, count in term_counts:
         term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.gse_attrs_term_counts WHERE term = '{term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
-        contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count]]
+        contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
         odds_ratio, p_value = fisher_exact(contingency_table)
         p_values.append(p_value)
         results.append({
             'term': term,
             'count': count,
             'odds_ratio': odds_ratio,
-            'pvalue': p_value
+            'pvalue': p_value,
+            'not_term_count': total_enrich_term_count - count,
+            'total_term_count': total_term_count,
+            'total_not_term_count': total_count - total_term_count
         })
     try:
         adjusted_p_values = multipletests(p_values, method='fdr_bh')[1]

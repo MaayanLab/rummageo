@@ -61,6 +61,9 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
         pvalue
         oddsRatio
         term
+        notTermCount
+        totalNotTermCount
+        totalTermCount
       }
     }
   }
