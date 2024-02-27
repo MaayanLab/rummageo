@@ -115,7 +115,7 @@ function EnrichmentResults({
               setTab(1)
             }}
           >
-            <span className="ml-1">Enrichment Table</span>
+            <span className="ml-1">Matching Gene Sets</span>
           </a>
         </li>
         <li className={classNames("z-30 flex-auto text-center p-2", { 'font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg': tab === 2 })}>
@@ -126,7 +126,7 @@ function EnrichmentResults({
               setTab(2)
             }}
           >
-            <span className="ml-1">Visualize Enriched Terms</span>
+            <span className="ml-1">Common Terms in Matching Gene Sets</span>
           </a>
         </li>
       </ul>
@@ -168,11 +168,7 @@ function EnrichmentResults({
         )}
       </h2>
       {!enrichmentResults?.background?.enrich ? (
-                <tr>
-                  <td colSpan={7}>
                     <Loading />
-                  </td>
-                </tr>
               ) : null}
       {tab == 1 ? <>
         <form
