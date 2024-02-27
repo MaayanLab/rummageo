@@ -55,6 +55,11 @@ export const options = {
   },
 };
 
+export interface WordData {
+  text: string;
+  value: number;
+}
+
 export default function TermVis({
   enrichedTerms,
 }: {
@@ -65,6 +70,8 @@ export default function TermVis({
   const startIndex = (currentPage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
   const [searchTerm, setSearchTerm] = useState("");
+
+  
 
   const enrichedTermsFiltered = useMemo(() => enrichedTerms?.filter(r => r.term?.toLowerCase().includes(searchTerm.toLowerCase())), [enrichedTerms, searchTerm]);
 
@@ -86,11 +93,10 @@ export default function TermVis({
     ],
   };
 
-  const wordCloudData =
-    useMemo(() => enrichedTerms?.map((term) => ({
-      text: term.term || "",
-      value: term.count || 0,
-    })) || [], [enrichedTerms]);
+  const wordCloudData = useMemo(() => enrichedTerms?.map((term) => ({
+    text: term.term || "",
+    value: (term.count ?? 1) * 10,
+  })) || [], [enrichedTerms]);
 
   const chartRef = useRef<ChartJS<"bar", (number | [number, number] | Point | BubbleDataPoint | null)[], unknown> | null>(null);
 
@@ -219,7 +225,7 @@ export default function TermVis({
         />
       </div>
       <div className="flex-col h-fit w-full mx-auto text-center justify-center">
-        <div className="inline-flex">
+        <div className="inline-flex w-fit">
           <Wordcloud
             words={wordCloudData}
             rotate={0}
