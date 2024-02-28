@@ -137,7 +137,8 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
     results = []
     p_values = []
     for term, count in term_counts:
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.gse_attrs_term_counts WHERE term = '{term}'")
+        escaped_term = term.replace("'", "''")
+        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.gse_attrs_term_counts WHERE term = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
         contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
         odds_ratio, p_value = fisher_exact(contingency_table)
