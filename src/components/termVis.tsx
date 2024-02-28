@@ -132,6 +132,7 @@ export default function TermVis({
             value={searchTerm}
             onChange={(evt) => {
               setSearchTerm(evt.currentTarget.value);
+              setCurrentPage(1);
             }}
           />
           <div className="tooltip" data-tip="Search results">
