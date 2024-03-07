@@ -49,6 +49,14 @@ as $$
 $$ language sql immutable strict parallel safe;
 grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
 
+create table app_public_v2.gse_terms (
+  gse varchar not null unique,
+  llm_attrs varchar[],
+  pubmed_attrs varchar[],
+  mesh_attrs varchar[]
+);
+
+
 -- migrate:down
 
 drop materialized view if exists app_public_v2.gene_set_pmid cascade;

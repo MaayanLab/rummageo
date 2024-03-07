@@ -115,16 +115,16 @@ CREATE TYPE app_public_v2.enriched_term_result AS (
 CREATE TYPE app_public_v2.paginated_enrich_result AS (
 	nodes app_public_v2.enrich_result[],
 	total_count integer,
-	enriched_terms app_public_v2.enriched_term_result[]
+	enriched_terms character varying[]
 );
 
 
 --
--- Name: enrich_functional_terms(character varying[], bigint); Type: FUNCTION; Schema: app_private_v2; Owner: -
+-- Name: enrich_functional_terms(character varying[], bigint, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
 --
 
-CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], total_count bigint) RETURNS app_public_v2.enriched_term_result[]
-    LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
+CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], total_count bigint, source_type character varying) RETURNS app_public_v2.enriched_term_result[]
+    LANGUAGE plpython3u IMMUTABLE
     AS $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
@@ -137,8 +137,9 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
     results = []
     p_values = []
     for term, count in term_counts:
+      try:
         escaped_term = term.replace("'", "''")
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.gse_attrs_term_counts WHERE term = '{escaped_term}'")
+        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts WHERE term = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
         contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
         odds_ratio, p_value = fisher_exact(contingency_table)
@@ -152,6 +153,9 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
             'total_term_count': total_term_count,
             'total_not_term_count': total_count - total_term_count
         })
+      except Exception as e:
+        print(e)
+        continue
     try:
         adjusted_p_values = multipletests(p_values, method='fdr_bh')[1]
         for i in range(len(results)):
@@ -159,33 +163,14 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
     except Exception as e:
         for i in range(len(results)):
             results[i]['adj_pvalue'] = 1
-    results = list(sorted(filter(lambda r: r['adj_pvalue'] < .05, results), key=lambda r: r['adj_pvalue']))
+    sig_results = list(filter(lambda r: r['adj_pvalue'] < .05, results))
+
+    if len(sig_results) > 50:
+        results = list(sorted(sig_results, key=lambda r: r['adj_pvalue']))[:50]
+    else:
+        results = list(sorted(results, key=lambda r: r['pvalue']))[:100]
+
     return results
-$$;
-
-
---
--- Name: enriched_functional_terms(character varying[]); Type: FUNCTION; Schema: app_private_v2; Owner: -
---
-
-CREATE FUNCTION app_private_v2.enriched_functional_terms(enriched_terms character varying[]) RETURNS app_public_v2.enriched_term_result[]
-    LANGUAGE sql IMMUTABLE SECURITY DEFINER PARALLEL SAFE
-    AS $$
-    with gse_ids as (
-        -- Split enriched_terms vector to get GSE ids
-        select regexp_replace(t, '\mGSE([^-]+)\M.*', 'GSE\1') as id
-        from unnest(enriched_terms) as t
-    ), gse_terms as (
-    -- Get list of functional terms called gse_attrs from app_public_v2.gse_info table
-        select array_agg(terms) as terms
-        from (
-            select unnest(gse_attrs) as terms
-            from app_public_v2.gse_info
-            where gse in (select id from gse_ids)
-        ) subquery
-    )
-    -- Call the enrich_functional_terms function
-    select * from app_private_v2.enrich_functional_terms((select terms from gse_terms), (select total_terms from app_public_v2.gse_attrs_terms_count));
 $$;
 
 
@@ -215,11 +200,12 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
     AS $$
   import requests
   import json
+
   params = dict(
     overlap_ge=overlap_ge,
     pvalue_le=pvalue_le,
     adj_pvalue_le=adj_pvalue_le,
-    filter_score=filter_score_le
+    score_filter=filter_score_le
   )
   if filter_term: params['filter_term'] = filter_term
   if offset: params['offset'] = offset
@@ -229,12 +215,20 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
     params=params,
     json=gene_ids,
   )
+  print(filter_score_le)
   total_count = req.headers.get('Content-Range').partition('/')[-1]
   req_json = req.json()
   enriched_terms = req_json.pop('terms')
-  enriched_terms = ','.join(f"'{item}'" for item in enriched_terms)
-  enriched_terms_result = plpy.execute(f"SELECT app_private_v2.enriched_functional_terms(ARRAY[{enriched_terms}::varchar])")[0]['enriched_functional_terms']
-  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_result)
+  gses = set()
+  enriched_terms_top_1000_gses = []
+  for term in enriched_terms:
+    gse = term.split('-')[0]
+    if gse not in gses:
+      gses.add(gse)
+      enriched_terms_top_1000_gses.append(term)
+    if len(enriched_terms_top_1000_gses) >= 1000:
+      break
+  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_1000_gses)
 $$;
 
 
@@ -350,6 +344,45 @@ CREATE FUNCTION app_public_v2.enrich_result_gene_set(enrich_result app_public_v2
   select gs.*
   from app_public_v2.gene_set gs
   where gs.id = enrich_result.gene_set_id;
+$$;
+
+
+--
+-- Name: enriched_functional_terms(character varying[], character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character varying[], source_type character varying) RETURNS app_public_v2.enriched_term_result[]
+    LANGUAGE sql IMMUTABLE SECURITY DEFINER
+    AS $$
+  with gse_ids as (
+    -- Split enriched_terms vector to get GSE ids
+    select regexp_replace(t, '\mGSE([^-]+)\M.*', 'GSE\1') as id
+    from unnest(enriched_terms) as t
+  ), gse_terms as (
+    -- Get list of functional terms based on the source_type
+    select array_agg(terms) as terms
+    from (
+      select unnest(
+        case
+          when source_type = 'llm_attrs' then llm_attrs
+          when source_type = 'pubmed_attrs' then pubmed_attrs
+          when source_type = 'mesh_attrs' then mesh_attrs
+        end
+      ) as terms
+      from app_public_v2.gse_terms
+      where gse in (select id from gse_ids)
+    ) subquery
+    )
+    -- Call the enrich_functional_terms function
+    select * from app_private_v2.enrich_functional_terms(
+      (select terms from gse_terms),
+      (select
+        case
+          when source_type = 'llm_attrs' then llm_attrs_total
+          when source_type = 'pubmed_attrs' then pubmed_attrs_total
+          when source_type = 'mesh_attrs' then mesh_attrs_total
+        end as total_terms
+      from app_public_v2.gse_attrs_terms_count), source_type)
 $$;
 
 
@@ -721,16 +754,15 @@ COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2
 
 
 --
--- Name: gse_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: gse_terms; Type: TABLE; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_term_counts AS
- SELECT subquery.elts AS term,
-    count(subquery.elts) AS term_count
-   FROM ( SELECT unnest(gse_info.gse_attrs) AS elts
-           FROM app_public_v2.gse_info) subquery
-  GROUP BY subquery.elts
-  WITH NO DATA;
+CREATE TABLE app_public_v2.gse_terms (
+    gse character varying NOT NULL,
+    llm_attrs character varying[],
+    pubmed_attrs character varying[],
+    mesh_attrs character varying[]
+);
 
 
 --
@@ -738,9 +770,39 @@ CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_term_counts AS
 --
 
 CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_terms_count AS
- SELECT count(subquery.elts) AS total_terms
-   FROM ( SELECT unnest(gse_info.gse_attrs) AS elts
-           FROM app_public_v2.gse_info) subquery
+ SELECT count(subquery.llm_elts) AS llm_attrs_total,
+    count(subquery.pubmed_elts) AS pubmed_attrs_total,
+    count(subquery.mesh_elts) AS mesh_attrs_total
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS llm_elts,
+            unnest(gse_terms.pubmed_attrs) AS pubmed_elts,
+            unnest(gse_terms.mesh_attrs) AS mesh_elts
+           FROM app_public_v2.gse_terms) subquery
+  WITH NO DATA;
+
+
+--
+-- Name: llm_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.llm_attrs_term_counts AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS elts
+           FROM app_public_v2.gse_terms) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
+
+
+--
+-- Name: mesh_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.mesh_attrs_term_counts AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.mesh_attrs) AS elts
+           FROM app_public_v2.gse_terms) subquery
+  GROUP BY subquery.elts
   WITH NO DATA;
 
 
@@ -758,6 +820,19 @@ CREATE VIEW app_public_v2.pmc AS
 --
 
 COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2.gene_set_pmc (pmc)';
+
+
+--
+-- Name: pubmed_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.pubmed_attrs_term_counts AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.pubmed_attrs) AS elts
+           FROM app_public_v2.gse_terms) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
 
 
 --
@@ -815,6 +890,14 @@ ALTER TABLE ONLY app_public_v2.gene
 
 ALTER TABLE ONLY app_public_v2.gse_info
     ADD CONSTRAINT gse_info_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: gse_terms gse_terms_gse_key; Type: CONSTRAINT; Schema: app_public_v2; Owner: -
+--
+
+ALTER TABLE ONLY app_public_v2.gse_terms
+    ADD CONSTRAINT gse_terms_gse_key UNIQUE (gse);
 
 
 --

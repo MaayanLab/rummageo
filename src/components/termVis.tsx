@@ -1,4 +1,4 @@
-import { EnrichedTermResult } from "@/graphql";
+import { EnrichedTermResult, TermEnrichmentQuery } from "@/graphql";
 import { useState, useRef, useMemo } from "react";
 import Pagination from "@/components/pagination";
 import clientDownloadBlob from '@/utils/clientDownloadBlob';
@@ -21,6 +21,10 @@ import { Text } from "@visx/text";
 import { FaSearch } from "react-icons/fa";
 import { TiDeleteOutline } from "react-icons/ti";
 import { MdOutlineFileDownload } from "react-icons/md";
+import classNames from "classnames";
+import Loading from "@/components/loading";
+const d3ToPng = require('d3-svg-to-png');
+
 
 ChartJS.register(
   CategoryScale,
@@ -62,8 +66,12 @@ export interface WordData {
 
 export default function TermVis({
   enrichedTerms,
+  sourceType,
+  setSourceType
 }: {
-  enrichedTerms: EnrichedTermResult[] | null | undefined;
+  enrichedTerms: EnrichedTermResult[] | undefined,
+  sourceType: string,
+  setSourceType: React.Dispatch<React.SetStateAction<string>>
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const entriesPerPage = 10;
@@ -71,21 +79,20 @@ export default function TermVis({
   const endIndex = startIndex + entriesPerPage;
   const [searchTerm, setSearchTerm] = useState("");
 
-  
 
-  const enrichedTermsFiltered = useMemo(() => enrichedTerms?.filter(r => r.term?.toLowerCase().includes(searchTerm.toLowerCase())), [enrichedTerms, searchTerm]);
+  const enrichedTermsFiltered = useMemo(() => enrichedTerms?.filter(r => r?.term?.toLowerCase().includes(searchTerm.toLowerCase())), [enrichedTerms, searchTerm]);
 
   const totalPages = useMemo(() => Math.ceil(enrichedTermsFiltered?.length || 1 / entriesPerPage), [enrichedTermsFiltered, entriesPerPage])
 
   const barChartData = {
-    labels: enrichedTermsFiltered?.slice(startIndex, endIndex).map((t) => t.term) || [],
+    labels: enrichedTermsFiltered?.slice(startIndex, endIndex).map((t) => t?.term) || [],
     datasets: [
       {
-        label: "-log10(adjPvalue)",
+        label: "-log10(P-value)",
         data:
           enrichedTermsFiltered
             ?.slice(startIndex, endIndex)
-            .map((t) => -Math.log10(t?.adjPvalue || 0)) || [],
+            .map((t) => -Math.log10(t?.pvalue || 0)) || [],
         backgroundColor: "#13ad65",
         borderColor: "#fcfffe",
         borderWidth: 2,
@@ -95,14 +102,39 @@ export default function TermVis({
 
   const wordCloudData = useMemo(() => enrichedTerms?.map((term) => ({
     text: term.term || "",
-    value: (term.count ?? 1) * 10,
+    value: Math.max((-Math.log(term?.pvalue ?? .5) * 50), 200),
   })) || [], [enrichedTerms]);
 
   const chartRef = useRef<ChartJS<"bar", (number | [number, number] | Point | BubbleDataPoint | null)[], unknown> | null>(null);
 
+  const handleDownloadImage = async () => {
+    const elt = document.getElementById('wc-svg')?.children[0] as HTMLElement
+    d3ToPng(elt, 'enriched_terms_wc', {download: true, format: 'png', ignore: '.ignore',  quality: 1})
+  };
+
+
   return (
+    <>
+    {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
+        <div className="flex gap-3">
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'llm_attrs'})}
+          onClick={() => {
+            setSourceType('llm_attrs')
+            setCurrentPage(1)
+          }}>LLM Extracted Terms</button>
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'pubmed_attrs'})}
+          onClick={() => {
+            setSourceType('pubmed_attrs')
+            setCurrentPage(1)
+          }}>PubMed Keywords</button>
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'mesh_attrs'})}
+          onClick={() => {
+            setSourceType('mesh_attrs')
+            setCurrentPage(1)
+            }}>MeSH Terms</button>
+        </div>
         <button
           className="float-right m-3"
           onClick={(evt) => {
@@ -226,8 +258,17 @@ export default function TermVis({
         />
       </div>
       <div className="flex-col h-fit w-full mx-auto text-center justify-center">
+      <button
+          className="float-right m-3"
+          onClick={handleDownloadImage}
+        >
+          <FaDownload/>
+          </button>
         <div className="inline-flex w-fit">
+        
+        <div id="wc-svg">
           <Wordcloud
+            
             words={wordCloudData}
             rotate={0}
             padding={5}
@@ -250,7 +291,10 @@ export default function TermVis({
             }
           </Wordcloud>
           </div>
+          
+          </div>
       </div>
-    </div>
+    </div> : <Loading />}
+    </>
   );
 }

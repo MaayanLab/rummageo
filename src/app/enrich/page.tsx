@@ -8,6 +8,7 @@ import {
   useViewGeneSetQuery,
   useGetBackgroundsQuery,
   EnrichedTermResult,
+  useTermEnrichmentQuery,
 } from "@/graphql";
 import determineSpecies from "@/utils/determineSpecies";
 import ensureArray from "@/utils/ensureArray";
@@ -22,6 +23,7 @@ import SamplesModal from "@/components/samplesModal";
 import partition from "@/utils/partition";
 import { FaSearch } from "react-icons/fa";
 import { TiDeleteOutline } from "react-icons/ti";
+import { FaFilter } from "react-icons/fa";
 import { MdOutlineFileDownload } from "react-icons/md";
 import classNames from "classnames";
 
@@ -69,6 +71,7 @@ function EnrichmentResults({
     [genes]
   );
   const [tab, setTab] = React.useState(1);
+  const [sourceType, setSourceType] = React.useState("llm_attrs");
 
   const { data: backgrounds } = useGetBackgroundsQuery();
   var backgroundIds: Record<string, string> = {};
@@ -77,6 +80,9 @@ function EnrichmentResults({
   });
   const [queryString, setQueryString] = useQsState({ page: "1", q: "" });
   const [rawTerm, setRawTerm] = React.useState("");
+  const [enrichedTerms, setEnrichedTerms] = React.useState<(string | null)[]>();
+  const [filterScore, setFilterScore] = React.useState(-1);
+  const [filterScoreSilder, setFilterScoreSilder] = React.useState(-1);
   const { page, term } = React.useMemo(
     () => ({
       page: queryString.page ? +queryString.page : 1,
@@ -92,12 +98,28 @@ function EnrichmentResults({
       offset: (page - 1) * pageSize,
       first: pageSize,
       id: backgroundIds[species],
+      filterScoreLe: filterScore
     },
   });
-  console.log(enrichmentResults);
+
   React.useEffect(() => {
     setRawTerm(term);
   }, [term]);
+
+  React.useEffect(() => {
+    if (enrichmentResults?.background?.enrich?.enrichedTerms) {
+      setEnrichedTerms(enrichmentResults?.background?.enrich?.enrichedTerms);
+    }
+  }, [enrichmentResults]);
+
+  const { data: termEnrichmentResults } = useTermEnrichmentQuery({
+    variables: {
+      enrichedTerms: enrichedTerms,
+      sourceType: sourceType
+    },
+  });
+
+
   return (
     <div className="flex flex-col gap-2 my-2">
       <ul
@@ -106,7 +128,7 @@ function EnrichmentResults({
         role="list"
       >
         <li
-          className={classNames("z-30 flex-auto text-center p-2", {
+          className={classNames("z-30 flex-auto text-center p-2 cursor-pointer", {
             "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
               tab === 1,
           })}
@@ -122,7 +144,7 @@ function EnrichmentResults({
           </a>
         </li>
         <li
-          className={classNames("z-30 flex-auto text-center p-2", {
+          className={classNames("z-30 flex-auto text-center p-2 cursor-pointer", {
             "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
               tab === 2,
           })}
@@ -178,6 +200,15 @@ function EnrichmentResults({
       {!enrichmentResults?.background?.enrich ? <Loading /> : null}
       {tab == 1 && enrichmentResults ? (
         <>
+          <div className="flex items-center justify-center gap-3">
+            <p className="text-sm">Silhouette Score Minimum: <b>{filterScoreSilder}</b></p>
+          <input id="default-range" type="range" value={filterScoreSilder} onChange={(evt) => setFilterScoreSilder(Number(evt.target.value))} max={1} min={-1} step={.01} className="w-1/8 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"></input>
+          <div className="tooltip" data-tip="Filter results">
+            <button className="btn bg-transparent"
+            onClick={() => setFilterScore(filterScoreSilder)}>
+              <FaFilter />
+            </button>
+            </div>
           <form
             className="join flex flex-row place-content-end place-items-center"
             onSubmit={(evt) => {
@@ -226,6 +257,7 @@ function EnrichmentResults({
               </div>
             </a>
           </form>
+          </div>
           <div className="overflow-x-auto">
             <table className="table table-xs">
               <thead>
@@ -515,9 +547,10 @@ function EnrichmentResults({
       {tab === 2 && enrichmentResults ? (
         <TermVis
           enrichedTerms={
-            enrichmentResults?.background?.enrich
-              ?.enrichedTerms as EnrichedTermResult[]
+            termEnrichmentResults?.enrichedFunctionalTerms as EnrichedTermResult[]
           }
+          sourceType={sourceType}
+          setSourceType={setSourceType}
         />
       ) : (
         <></>

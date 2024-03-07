@@ -157,23 +157,27 @@ def import_gse_attrs(plpy, species='human'):
 
   to_ingest = list(set(to_ingest))
   
-  with open(f'data/gse_attrs_clean_{species}_v4.json') as f:
+  with open(f'data/{species}_keyterm_library_gse_llm.json') as f:
     gse_attrs = json.load(f)
   
-  with open(f'data/gse_processed_meta_{species}_conf.json') as f:
-    gse_conf = json.load(f)
+
 
   for gse in tqdm(to_ingest):
-      sql = """
-      UPDATE app_public_v2.gse_info
-      SET gse_attrs = %s, silhouette_score = %s
-      WHERE gse = %s;
-      """
-      all_attrs = []
-      for k in gse_attrs[gse]:
-        all_attrs += gse_attrs[gse][k]
-      silhouette_score = gse_conf[gse]['silhouette_score']
-      plpy.execute(sql, (all_attrs, silhouette_score, gse))
+    sql = """
+        INSERT INTO app_public_v2.gse_terms (gse, llm_attrs, pubmed_attrs, mesh_attrs)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (gse) DO UPDATE SET
+        llm_attrs = EXCLUDED.llm_attrs,
+        pubmed_attrs = EXCLUDED.pubmed_attrs,
+        mesh_attrs = EXCLUDED.mesh_attrs;
+        """
+    if gse not in gse_attrs:
+      plpy.execute(sql, (gse, [], [], []))
+    else:
+      llm_attrs = gse_attrs[gse]['LLM']
+      pubmed_attrs = gse_attrs[gse]['PubMed']
+      mesh_attrs = gse_attrs[gse]['MeSH']
+      plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs))
 
 
 
@@ -275,10 +279,13 @@ def import_gse_info(plpy, species='human'):
   samples_to_ingest = list(set(samples_to_ingest) - set(gsms_ingested))
   samps_df_to_ingest = samps_df.loc[list(samples_to_ingest)]
 
+  with open(f'data/gse_processed_meta_{species}_conf.json') as f:
+    gse_conf = json.load(f)
+
 
   
   copy_from_records(
-    plpy.conn, 'app_public_v2.gse_info', ('gse', 'pmid', 'title', 'summary', 'published_date', 'species', 'platform', 'sample_groups'),
+    plpy.conn, 'app_public_v2.gse_info', ('gse', 'pmid', 'title', 'summary', 'published_date', 'species', 'platform', 'sample_groups', 'silhouette_score'),
     tqdm((
       dict(
         gse=gse,
@@ -289,6 +296,7 @@ def import_gse_info(plpy, species='human'):
         species=species,
         platform=gse_info_to_ingest[gse]['platform'],
         sample_groups=json.dumps(gse_info_to_ingest[gse]['sample_groups']),
+        silhouette_score=gse_conf[gse]['silhouette_score']
       )
       for gse in to_ingest
       if gse in gse_info_to_ingest
