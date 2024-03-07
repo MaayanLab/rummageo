@@ -98,7 +98,7 @@ function EnrichmentResults({
       offset: (page - 1) * pageSize,
       first: pageSize,
       id: backgroundIds[species],
-      filterScoreLe: filterScore
+      filterScoreLe: filterScore,
     },
   });
 
@@ -115,23 +115,25 @@ function EnrichmentResults({
   const { data: termEnrichmentResults } = useTermEnrichmentQuery({
     variables: {
       enrichedTerms: enrichedTerms,
-      sourceType: sourceType
+      sourceType: sourceType,
     },
   });
-
 
   return (
     <div className="flex flex-col gap-2 my-2">
       <ul
-        className="relative flex flex-wrap p-1 list-none rounded-lg bg-inherit"
+        className="relative flex flex-wrap p-1 list-none rounded-lg bg-inherit gap-1"
         data-tabs="tabs"
         role="list"
       >
         <li
-          className={classNames("z-30 flex-auto text-center p-2 cursor-pointer", {
-            "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
-              tab === 1,
-          })}
+          className={classNames(
+            "z-30 flex-auto text-center p-2 cursor-pointer border rounded-md",
+            {
+              "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
+                tab === 1,
+            }
+          )}
         >
           <a
             className="z-30 flex items-center justify-center w-full px-0 py-1 mb-0 transition-all ease-in-out rounded-lg cursor-pointerbg-inherit"
@@ -144,10 +146,13 @@ function EnrichmentResults({
           </a>
         </li>
         <li
-          className={classNames("z-30 flex-auto text-center p-2 cursor-pointer", {
-            "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
-              tab === 2,
-          })}
+          className={classNames(
+            "z-30 flex-auto text-center p-2 cursor-pointer border rounded-md",
+            {
+              "font-bold text-white bg-slate-700 bg-opacity-50 rounded-lg":
+                tab === 2,
+            }
+          )}
         >
           <a
             className="z-30 flex items-center justify-center w-full px-0 py-1 mb-0 transition-all ease-in-out rounded-lg cursor-pointerbg-inherit"
@@ -200,63 +205,76 @@ function EnrichmentResults({
       {!enrichmentResults?.background?.enrich ? <Loading /> : null}
       {tab == 1 && enrichmentResults ? (
         <>
-          <div className="flex items-center justify-center gap-3">
-            <p className="text-sm">Silhouette Score Minimum: <b>{filterScoreSilder}</b></p>
-          <input id="default-range" type="range" value={filterScoreSilder} onChange={(evt) => setFilterScoreSilder(Number(evt.target.value))} max={1} min={-1} step={.01} className="w-1/8 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"></input>
-          <div className="tooltip" data-tip="Filter results">
-            <button className="btn bg-transparent"
-            onClick={() => setFilterScore(filterScoreSilder)}>
-              <FaFilter />
-            </button>
-            </div>
-          <form
-            className="join flex flex-row place-content-end place-items-center"
-            onSubmit={(evt) => {
-              evt.preventDefault();
-              setQueryString({ page: "1", q: rawTerm });
-            }}
-          >
+          <div className="flex items-center justify-end gap-3">
+            <p className="text-sm">
+              Silhouette Score Minimum: <b>{filterScoreSilder}</b>
+            </p>
             <input
-              type="text"
-              className="input input-bordered bg-transparent join-item"
-              value={rawTerm}
-              onChange={(evt) => {
-                setRawTerm(evt.currentTarget.value);
+              id="default-range"
+              type="range"
+              value={filterScoreSilder}
+              onChange={(evt) => setFilterScoreSilder(Number(evt.target.value))}
+              max={1}
+              min={-1}
+              step={0.01}
+              className="w-1/8 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+            ></input>
+            <div className="tooltip" data-tip="Filter results">
+              <button
+                className="btn bg-transparent"
+                onClick={() => setFilterScore(filterScoreSilder)}
+              >
+                <FaFilter />
+              </button>
+            </div>
+            <form
+              className="join flex flex-row place-content-end place-items-center"
+              onSubmit={(evt) => {
+                evt.preventDefault();
+                setQueryString({ page: "1", q: rawTerm });
               }}
-            />
-            <div className="tooltip" data-tip="Search results">
-              <button
-                type="submit"
-                className="btn join-item bg-transparent ml-2"
-              >
-                <FaSearch />
-              </button>
-            </div>
-            <div className="tooltip" data-tip="Clear search">
-              <button
-                type="reset"
-                className="btn join-item bg-transparent"
-                onClick={(evt) => {
-                  setQueryString({ page: "1", q: "" });
-                }}
-              >
-                <TiDeleteOutline />
-              </button>
-            </div>
-            <a
-              href={`/enrich/download?dataset=${queryString.dataset}&q=${queryString.q}`}
-              download="results.tsv"
             >
-              <div className="tooltip" data-tip="Download results">
+              <input
+                type="text"
+                className="input input-bordered bg-transparent join-item"
+                value={rawTerm}
+                onChange={(evt) => {
+                  setRawTerm(evt.currentTarget.value);
+                }}
+              />
+              <div className="tooltip" data-tip="Search results">
                 <button
-                  type="button"
-                  className="btn join-item font-bold text-2xl pb-1 bg-transparent"
+                  type="submit"
+                  className="btn join-item bg-transparent ml-2"
                 >
-                  <MdOutlineFileDownload />
+                  <FaSearch />
                 </button>
               </div>
-            </a>
-          </form>
+              <div className="tooltip" data-tip="Clear search">
+                <button
+                  type="reset"
+                  className="btn join-item bg-transparent"
+                  onClick={(evt) => {
+                    setQueryString({ page: "1", q: "" });
+                  }}
+                >
+                  <TiDeleteOutline />
+                </button>
+              </div>
+              <a
+                href={`/enrich/download?dataset=${queryString.dataset}&q=${queryString.q}`}
+                download="results.tsv"
+              >
+                <div className="tooltip" data-tip="Download results">
+                  <button
+                    type="button"
+                    className="btn join-item font-bold text-2xl pb-1 bg-transparent"
+                  >
+                    <MdOutlineFileDownload />
+                  </button>
+                </div>
+              </a>
+            </form>
           </div>
           <div className="overflow-x-auto">
             <table className="table table-xs">
