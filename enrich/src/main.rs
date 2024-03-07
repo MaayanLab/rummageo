@@ -291,6 +291,7 @@ async fn query(
     let overlap_ge = overlap_ge.unwrap_or(1);
     let pvalue_le =  pvalue_le.unwrap_or(1.0);
     let adj_pvalue_le =  adj_pvalue_le.unwrap_or(1.0);
+    let score_filter = score_filter.unwrap_or(-1.0);
     let background_query = Arc::new(BackgroundQuery { background_id, input_gene_set });
     let results = {
         let results = state.cache.get(&background_query).await;
@@ -350,8 +351,8 @@ async fn query(
             let (gene_set_id, gene_set_term, title, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
             if let Some(filter_term) = &filter_term {
                 if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) { return None }
-            } else if let Some(score_filter) = &score_filter {
-                if silhouette_score < score_filter { return None }
+            } else if *silhouette_score < score_filter {
+                return None
             }
             all_enriched_terms.push(gene_set_term.clone());
             Some(QueryResult {
