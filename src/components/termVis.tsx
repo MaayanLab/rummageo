@@ -245,7 +245,7 @@ export default function TermVis({
                     setTab(1)
                   }
                   }>
-                    <div className="tooltip underline" data-tip={`View enriched signatures which mention ${row.term}`}>
+                    <div className="tooltip tooltip-right underline" data-tip={`View enriched signatures which mention ${row.term}`}>
                       <b>{row.term}</b>
                     </div>
                   </a>
