@@ -1,4 +1,4 @@
-import { EnrichedTermResult, TermEnrichmentQuery } from "@/graphql";
+import { EnrichedTermResult } from "@/graphql";
 import { useState, useRef, useMemo } from "react";
 import Pagination from "@/components/pagination";
 import clientDownloadBlob from '@/utils/clientDownloadBlob';
@@ -59,6 +59,7 @@ export const options = {
   },
 };
 
+
 export interface WordData {
   text: string;
   value: number;
@@ -67,11 +68,15 @@ export interface WordData {
 export default function TermVis({
   enrichedTerms,
   sourceType,
-  setSourceType
+  setSourceType,
+  setTab,
+  setFilterTerm
 }: {
   enrichedTerms: EnrichedTermResult[] | undefined,
   sourceType: string,
-  setSourceType: React.Dispatch<React.SetStateAction<string>>
+  setSourceType: React.Dispatch<React.SetStateAction<string>>,
+  setTab: React.Dispatch<React.SetStateAction<number>>,
+  setFilterTerm: Function,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const entriesPerPage = 10;
@@ -79,10 +84,10 @@ export default function TermVis({
   const endIndex = startIndex + entriesPerPage;
   const [searchTerm, setSearchTerm] = useState("");
 
-
   const enrichedTermsFiltered = useMemo(() => enrichedTerms?.filter(r => r?.term?.toLowerCase().includes(searchTerm.toLowerCase())), [enrichedTerms, searchTerm]);
 
   const totalPages = useMemo(() => Math.ceil(enrichedTermsFiltered?.length || 1 / entriesPerPage), [enrichedTermsFiltered, entriesPerPage])
+
 
   const barChartData = {
     labels: enrichedTermsFiltered?.slice(startIndex, endIndex).map((t) => t?.term) || [],
@@ -118,6 +123,7 @@ export default function TermVis({
     {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
+        <p className="font-light mb-3">Functional term signfigance for the top 1000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
         <div className="flex gap-3">
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'llm_attrs'})}
           onClick={() => {
@@ -234,7 +240,15 @@ export default function TermVis({
             return (
               <tr key={i} className="text-center">
                 <td>
-                  <b>{row.term}</b>
+                  <a className="link" onClick={() => {
+                    setFilterTerm({page: "1", q: row.term})
+                    setTab(1)
+                  }
+                  }>
+                    <div className="tooltip underline" data-tip={`View enriched signatures which mention ${row.term}`}>
+                      <b>{row.term}</b>
+                    </div>
+                  </a>
                 </td>
                 <td>{row.count}</td>
                 <td>{row.notTermCount}</td>

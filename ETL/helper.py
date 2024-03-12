@@ -164,20 +164,20 @@ def import_gse_attrs(plpy, species='human'):
 
   for gse in tqdm(to_ingest):
     sql = """
-        INSERT INTO app_public_v2.gse_terms (gse, llm_attrs, pubmed_attrs, mesh_attrs)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (gse) DO UPDATE SET
+        INSERT INTO app_public_v2.gse_terms (gse, llm_attrs, pubmed_attrs, mesh_attrs, species)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (gse, species) DO UPDATE SET
         llm_attrs = EXCLUDED.llm_attrs,
         pubmed_attrs = EXCLUDED.pubmed_attrs,
         mesh_attrs = EXCLUDED.mesh_attrs;
         """
     if gse not in gse_attrs:
-      plpy.execute(sql, (gse, [], [], []))
+      plpy.execute(sql, (gse, [], [], [], species))
     else:
       llm_attrs = gse_attrs[gse]['LLM']
       pubmed_attrs = gse_attrs[gse]['PubMed']
       mesh_attrs = gse_attrs[gse]['MeSH']
-      plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs))
+      plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs, species))
 
 
 

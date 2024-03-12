@@ -116,6 +116,7 @@ function EnrichmentResults({
     variables: {
       enrichedTerms: enrichedTerms,
       sourceType: sourceType,
+      species: species,
     },
   });
 
@@ -207,7 +208,7 @@ function EnrichmentResults({
         <>
           <div className="flex items-center justify-end gap-3">
             <p className="text-sm">
-              Silhouette Score Minimum: <b>{filterScoreSilder}</b>
+            Minimum Silhouette Score: <b>{filterScoreSilder}</b>
             </p>
             <input
               id="default-range"
@@ -569,6 +570,8 @@ function EnrichmentResults({
           }
           sourceType={sourceType}
           setSourceType={setSourceType}
+          setTab={setTab}
+          setFilterTerm={setQueryString}
         />
       ) : (
         <></>

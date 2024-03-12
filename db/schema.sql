@@ -120,15 +120,19 @@ CREATE TYPE app_public_v2.paginated_enrich_result AS (
 
 
 --
--- Name: enrich_functional_terms(character varying[], bigint, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
+-- Name: enrich_functional_terms(character varying[], character varying, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
 --
 
-CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], total_count bigint, source_type character varying) RETURNS app_public_v2.enriched_term_result[]
+CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], source_type character varying, species character varying) RETURNS app_public_v2.enriched_term_result[]
     LANGUAGE plpython3u IMMUTABLE
     AS $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
+    import math
+
+    total_count = plpy.execute(f"SELECT {source_type}_total FROM app_public_v2.gse_attrs_terms_count_{species}")[0][f'{source_type}_total']
+    total_documents = plpy.execute(f"SELECT count(gse) as gse_count FROM app_public_v2.gse_terms where species = '{species}'")[0][f'gse_count']
 
     term_counter = Counter(concat_terms)
     term_counts = list(term_counter.items())
@@ -139,10 +143,11 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
     for term, count in term_counts:
       try:
         escaped_term = term.replace("'", "''")
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts WHERE term = '{escaped_term}'")
+        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts_{species} WHERE term = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
         contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
         odds_ratio, p_value = fisher_exact(contingency_table)
+        #p_value = (1 / math.log((total_documents/total_count) + 1)) * p_value
         p_values.append(p_value)
         results.append({
             'term': term,
@@ -161,6 +166,7 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
         for i in range(len(results)):
             results[i]['adj_pvalue'] = adjusted_p_values[i]
     except Exception as e:
+        print(e)
         for i in range(len(results)):
             results[i]['adj_pvalue'] = 1
     sig_results = list(filter(lambda r: r['adj_pvalue'] < .05, results))
@@ -169,7 +175,6 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character va
         results = list(sorted(sig_results, key=lambda r: r['adj_pvalue']))[:50]
     else:
         results = list(sorted(results, key=lambda r: r['pvalue']))[:100]
-
     return results
 $$;
 
@@ -220,15 +225,15 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
   req_json = req.json()
   enriched_terms = req_json.pop('terms')
   gses = set()
-  enriched_terms_top_1000_gses = []
+  enriched_terms_top_gses = []
   for term in enriched_terms:
     gse = term.split('-')[0]
     if gse not in gses:
       gses.add(gse)
-      enriched_terms_top_1000_gses.append(term)
-    if len(enriched_terms_top_1000_gses) >= 1000:
+      enriched_terms_top_gses.append(term)
+    if len(enriched_terms_top_gses) >= 1000:
       break
-  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_1000_gses)
+  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
 $$;
 
 
@@ -348,10 +353,10 @@ $$;
 
 
 --
--- Name: enriched_functional_terms(character varying[], character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
+-- Name: enriched_functional_terms(character varying[], character varying, character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
-CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character varying[], source_type character varying) RETURNS app_public_v2.enriched_term_result[]
+CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character varying[], source_type character varying, organism character varying) RETURNS app_public_v2.enriched_term_result[]
     LANGUAGE sql IMMUTABLE SECURITY DEFINER
     AS $$
   with gse_ids as (
@@ -370,19 +375,13 @@ CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character
         end
       ) as terms
       from app_public_v2.gse_terms
-      where gse in (select id from gse_ids)
+      where gse in (select id from gse_ids) and species = organism
     ) subquery
     )
     -- Call the enrich_functional_terms function
     select * from app_private_v2.enrich_functional_terms(
       (select terms from gse_terms),
-      (select
-        case
-          when source_type = 'llm_attrs' then llm_attrs_total
-          when source_type = 'pubmed_attrs' then pubmed_attrs_total
-          when source_type = 'mesh_attrs' then mesh_attrs_total
-        end as total_terms
-      from app_public_v2.gse_attrs_terms_count), source_type)
+      source_type, organism)
 $$;
 
 
@@ -466,7 +465,7 @@ CREATE TABLE app_public_v2.gse_info (
     platform character varying,
     sample_groups jsonb,
     silhouette_score double precision,
-    gse_attrs character varying[]
+    gse_attrs character varying
 );
 
 
@@ -759,6 +758,7 @@ COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2
 
 CREATE TABLE app_public_v2.gse_terms (
     gse character varying NOT NULL,
+    species character varying NOT NULL,
     llm_attrs character varying[],
     pubmed_attrs character varying[],
     mesh_attrs character varying[]
@@ -766,42 +766,89 @@ CREATE TABLE app_public_v2.gse_terms (
 
 
 --
--- Name: gse_attrs_terms_count; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: gse_attrs_terms_count_human; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_terms_count AS
+CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_terms_count_human AS
  SELECT count(subquery.llm_elts) AS llm_attrs_total,
     count(subquery.pubmed_elts) AS pubmed_attrs_total,
     count(subquery.mesh_elts) AS mesh_attrs_total
    FROM ( SELECT unnest(gse_terms.llm_attrs) AS llm_elts,
             unnest(gse_terms.pubmed_attrs) AS pubmed_elts,
             unnest(gse_terms.mesh_attrs) AS mesh_elts
-           FROM app_public_v2.gse_terms) subquery
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
   WITH NO DATA;
 
 
 --
--- Name: llm_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: gse_attrs_terms_count_mouse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.llm_attrs_term_counts AS
+CREATE MATERIALIZED VIEW app_public_v2.gse_attrs_terms_count_mouse AS
+ SELECT count(subquery.llm_elts) AS llm_attrs_total,
+    count(subquery.pubmed_elts) AS pubmed_attrs_total,
+    count(subquery.mesh_elts) AS mesh_attrs_total
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS llm_elts,
+            unnest(gse_terms.pubmed_attrs) AS pubmed_elts,
+            unnest(gse_terms.mesh_attrs) AS mesh_elts
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
+  WITH NO DATA;
+
+
+--
+-- Name: llm_attrs_term_counts_human; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.llm_attrs_term_counts_human AS
  SELECT subquery.elts AS term,
     count(subquery.elts) AS term_count
    FROM ( SELECT unnest(gse_terms.llm_attrs) AS elts
-           FROM app_public_v2.gse_terms) subquery
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
   GROUP BY subquery.elts
   WITH NO DATA;
 
 
 --
--- Name: mesh_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: llm_attrs_term_counts_mouse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.mesh_attrs_term_counts AS
+CREATE MATERIALIZED VIEW app_public_v2.llm_attrs_term_counts_mouse AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS elts
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
+
+
+--
+-- Name: mesh_attrs_term_counts_human; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.mesh_attrs_term_counts_human AS
  SELECT subquery.elts AS term,
     count(subquery.elts) AS term_count
    FROM ( SELECT unnest(gse_terms.mesh_attrs) AS elts
-           FROM app_public_v2.gse_terms) subquery
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
+
+
+--
+-- Name: mesh_attrs_term_counts_mouse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.mesh_attrs_term_counts_mouse AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.mesh_attrs) AS elts
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
   GROUP BY subquery.elts
   WITH NO DATA;
 
@@ -823,14 +870,29 @@ COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2
 
 
 --
--- Name: pubmed_attrs_term_counts; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: pubmed_attrs_term_counts_human; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.pubmed_attrs_term_counts AS
+CREATE MATERIALIZED VIEW app_public_v2.pubmed_attrs_term_counts_human AS
  SELECT subquery.elts AS term,
     count(subquery.elts) AS term_count
    FROM ( SELECT unnest(gse_terms.pubmed_attrs) AS elts
-           FROM app_public_v2.gse_terms) subquery
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
+  GROUP BY subquery.elts
+  WITH NO DATA;
+
+
+--
+-- Name: pubmed_attrs_term_counts_mouse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.pubmed_attrs_term_counts_mouse AS
+ SELECT subquery.elts AS term,
+    count(subquery.elts) AS term_count
+   FROM ( SELECT unnest(gse_terms.pubmed_attrs) AS elts
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
   GROUP BY subquery.elts
   WITH NO DATA;
 
@@ -893,11 +955,11 @@ ALTER TABLE ONLY app_public_v2.gse_info
 
 
 --
--- Name: gse_terms gse_terms_gse_key; Type: CONSTRAINT; Schema: app_public_v2; Owner: -
+-- Name: gse_terms gse_terms_gse_species_key; Type: CONSTRAINT; Schema: app_public_v2; Owner: -
 --
 
 ALTER TABLE ONLY app_public_v2.gse_terms
-    ADD CONSTRAINT gse_terms_gse_key UNIQUE (gse);
+    ADD CONSTRAINT gse_terms_gse_species_key UNIQUE (gse, species);
 
 
 --

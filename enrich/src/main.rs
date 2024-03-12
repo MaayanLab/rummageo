@@ -37,7 +37,7 @@ struct Postgres(sqlx::PgPool);
 struct Bitmap {
     columns: HashMap<Uuid, u32>,
     columns_str: Vec<String>,
-    values: Vec<(Uuid, String, String, f64, FnvHashSet<u32>)>,
+    values: Vec<(Uuid, String, String, String, f64, FnvHashSet<u32>)>,
 }
 
 
@@ -113,7 +113,7 @@ struct QueryResponse {
 #[rocket::async_trait]
 impl<'r> Responder<'r, 'static> for QueryResponse {
     fn respond_to(self, _: &'r Request<'_>) -> response::Result<'static> {
-        let mut json = rocket::serde::json::serde_json::json!({
+        let json = rocket::serde::json::serde_json::json!({
             "results": &self.results,
             "terms": &self.terms
         });
@@ -160,18 +160,19 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
         }
 
         // compute the index in memory
-        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title, gp.silhouette_score from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id where gs.species = '{}';", species).as_str())
+        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title, gp.silhouette_score, gp.gse_attrs from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id where gs.species = '{}';", species).as_str())
             .fetch(&mut **db)
             .for_each(|row| {
                 let row = row.unwrap();
                 let gene_set_id: uuid::Uuid = row.try_get("id").unwrap();
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
+                let attrs: String = row.try_get("gse_attrs").unwrap();
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
                 let bitset = bitvec(&bitmap.columns, gene_ids);
-                bitmap.values.push((gene_set_id, term, title, silhouette_score, bitset));
+                bitmap.values.push((gene_set_id, term, title, attrs, silhouette_score, bitset));
                 future::ready(())
             })
             .await;
@@ -221,7 +222,7 @@ async fn get_gmt(
     ensure_index(&mut db, &state, background_id).await.map_err(|e| Custom(Status::InternalServerError, e.to_string()))?;
     let bitmap = state.bitmaps.get_read(&background_id).await.ok_or(Custom(Status::InternalServerError, String::from("Can't find background")))?;
     Ok(TextStream! {
-        for (_row_id, row_str, _title, _silhouette_score, gene_set) in bitmap.values.iter() {
+        for (_row_id, row_str, _title, _attrs, _silhouette_score, gene_set) in bitmap.values.iter() {
             let mut line = String::new();
             line.push_str(row_str);
             line.push_str("\t");
@@ -303,7 +304,7 @@ async fn query(
             let n_user_gene_id = background_query.input_gene_set.len() as u32;
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
-                .filter_map(|(index, (_row_id, _row_str, _title_str, _silhouette_score, gene_set))| {
+                .filter_map(|(index, (_row_id, _row_str, _title_str, _attrs, _silhouette_score, gene_set))| {
                     let n_overlap = gene_set.intersection(&background_query.input_gene_set).count() as u32;
                     if n_overlap < overlap_ge {
                         return None
@@ -348,10 +349,12 @@ async fn query(
     let mut results: Vec<_> = results
         .iter()
         .filter_map(|result| {
-            let (gene_set_id, gene_set_term, title, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
+            let (gene_set_id, gene_set_term, title, attrs, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
             if let Some(filter_term) = &filter_term {
-                if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) { return None }
-            } else if *silhouette_score < score_filter {
+                if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) && !attrs.contains(filter_term) { return None }
+
+            } 
+            if *silhouette_score < score_filter {
                 return None
             }
             all_enriched_terms.push(gene_set_term.clone());

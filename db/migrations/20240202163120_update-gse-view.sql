@@ -50,12 +50,13 @@ $$ language sql immutable strict parallel safe;
 grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
 
 create table app_public_v2.gse_terms (
-  gse varchar not null unique,
+  gse varchar not null,
+  species varchar not null,
   llm_attrs varchar[],
   pubmed_attrs varchar[],
-  mesh_attrs varchar[]
+  mesh_attrs varchar[],
+  unique (gse, species)
 );
-
 
 -- migrate:down
 
