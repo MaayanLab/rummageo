@@ -290,7 +290,7 @@ export default function UserManual() {
           <p>
           For example, enrichment analysis queries can be performed in Python agaisnt the RummaGEO human gene sets using the requests library as follows:
           </p>
-          <div className="text-gray bg-slate-700 text-xs font-mono mt-5 p-5 rounded-lg box-content sm:max-w-xl sm:overflow-scroll md:max-w-xl lg:max-w-3xl xl:max-w-full">
+          <div className="text-gray bg-slate-300 dark:bg-slate-700 text-xs font-mono mt-5 p-5 rounded-lg box-content sm:max-w-xl sm:overflow-scroll md:max-w-xl lg:max-w-3xl xl:max-w-full">
             <button className="float-right" onClick={() => navigator.clipboard.writeText(codeExample)}><FaCopy/></button>
             <pre>
               <code>
