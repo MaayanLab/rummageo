@@ -1,5 +1,6 @@
 import React from "react";
 import LinkedTerm from "@/components/linkedTerm";
+import parse from 'html-react-parser';
 import { useViewGeneSetQuery } from "@/graphql";
 import GeneSetModal from "@/components/geneSetModal";
 import SamplesModal from "@/components/samplesModal";
@@ -11,6 +12,7 @@ import partition from "@/utils/partition";
 import { FaSearch } from "react-icons/fa";
 import { TiDeleteOutline } from "react-icons/ti"
 import { MdOutlineFileDownload } from "react-icons/md"
+import { renderToHTML } from "next/dist/server/render";
 
 const pageSize = 10;
 
@@ -290,14 +292,7 @@ export default function TermTable({
                       )}
                     </th>
                     <td>{el?.geneSetById?.species ?? ""}</td>
-                    {el?.title
-                      ? el.title.split(filterTerm).map((part, i) => (
-                          <>
-                            {i > 0 && <b>{filterTerm}</b>}
-                            {part}
-                          </>
-                        ))
-                      : ""}
+                    {parse(el?.title?.replace(new RegExp(filterTerm, "gi"), (match) => `<b>${match}</b>`) || "")}
                     <td>
                       <label
                         htmlFor="geneSetModal"
