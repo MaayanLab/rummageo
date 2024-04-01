@@ -45,4 +45,8 @@
   .white {
     color: white important!;
   }
+
+  dialog {
+    background: transparent;
+  }
   

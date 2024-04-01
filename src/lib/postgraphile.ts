@@ -19,6 +19,7 @@ export default postgraphile(
     showErrorStack: process.env.NODE_ENV === 'production' ? undefined : 'json',
     appendPlugins: [require("@graphile-contrib/pg-simplify-inflector")],
     graphiql: true,
+    bodySizeLimit: '50mb',
     enhanceGraphiql: true,
     enableQueryBatching: true,
     disableQueryLog: process.env.NODE_ENV === 'production',

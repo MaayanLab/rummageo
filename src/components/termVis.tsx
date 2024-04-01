@@ -107,7 +107,7 @@ export default function TermVis({
 
   const wordCloudData = useMemo(() => enrichedTerms?.map((term) => ({
     text: term.term || "",
-    value: Math.max((-Math.log(term?.pvalue ?? .5) * 50), 200),
+    value: Math.max((-Math.log(term?.pvalue ?? .5) * 150), 200),
   })) || [], [enrichedTerms]);
 
   const chartRef = useRef<ChartJS<"bar", (number | [number, number] | Point | BubbleDataPoint | null)[], unknown> | null>(null);
@@ -123,19 +123,19 @@ export default function TermVis({
     {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
-        <p className="font-light mb-3">Functional term signfigance for the top 1000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
+        <p className="font-light mb-3">Functional term signfigance for the top 10,000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
         <div className="flex gap-3">
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'llm_attrs'})}
+          <button className={classNames("btn btn-outline", {"bg-slate-300 dark:bg-slate-800": sourceType == 'llm_attrs'})}
           onClick={() => {
             setSourceType('llm_attrs')
             setCurrentPage(1)
           }}>LLM Extracted Terms</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'pubmed_attrs'})}
+          <button className={classNames("btn btn-outline", {"bg-slate-300 dark:bg-slate-800": sourceType == 'pubmed_attrs'})}
           onClick={() => {
             setSourceType('pubmed_attrs')
             setCurrentPage(1)
           }}>PubMed Keywords</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'mesh_attrs'})}
+          <button className={classNames("btn btn-outline", {"bg-slate-300 dark:bg-slate-800": sourceType == 'mesh_attrs'})}
           onClick={() => {
             setSourceType('mesh_attrs')
             setCurrentPage(1)
@@ -201,14 +201,12 @@ export default function TermVis({
                 onClick={(evt) => {
                   evt.preventDefault()
                   if (!enrichedTermsFiltered) return
-                  const blob = blobTsv(['term', 'CountInEnrichedGSEs', 'OtherTermsInEnrichedGSEs', 'TotalGSEsWithTerm', 'TotalOtherTerms', 'OddsRatio', 'Pvalue', 'AdjPvalue'], enrichedTermsFiltered, elt => {
+                  const blob = blobTsv(['term', 'CountInEnrichedGSEs','TotalGSEsWithTerm', 'Statistic', 'Pvalue', 'AdjPvalue'], enrichedTermsFiltered, elt => {
                   return {
                   term: elt.term,
                   CountInEnrichedGSEs: elt.count,
-                  OtherTermsInEnrichedGSEs: elt.notTermCount,
                   TotalGSEsWithTerm: elt.totalTermCount,
-                  TotalOtherTerms: elt.totalNotTermCount,
-                  OddsRatio: elt.oddsRatio,
+                  Statistic: elt.statistic,
                   Pvalue: elt.pvalue,
                   AdjPvalue: elt.adjPvalue
                   }
@@ -227,10 +225,8 @@ export default function TermVis({
           <tr className="text-center">
             <th>Term</th>
             <th>Count in Enriched GSEs</th>
-            <th>Other terms in Enriched GSEs</th>
             <th>Total GSEs w/ term</th>
-            <th>Total other terms</th>
-            <th>Odds Ratio</th>
+            <th>KS Statistic</th>
             <th>P-value</th>
             <th>Adj. P-value</th>
           </tr>
@@ -251,10 +247,8 @@ export default function TermVis({
                   </a>
                 </td>
                 <td>{row.count}</td>
-                <td>{row.notTermCount}</td>
                 <td>{row.totalTermCount}</td>
-                <td>{row.totalNotTermCount}</td>
-                <td>{row.oddsRatio?.toPrecision(3)}</td>
+                <td>{row.statistic?.toPrecision(3)}</td>
                 <td>{row.pvalue?.toPrecision(3)}</td>
                 <td>{row.adjPvalue?.toPrecision(3)}</td>
               </tr>

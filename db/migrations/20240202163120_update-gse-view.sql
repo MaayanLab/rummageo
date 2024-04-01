@@ -58,6 +58,12 @@ create table app_public_v2.gse_terms (
   unique (gse, species)
 );
 
+create table app_public_v2.term_categories (
+  term_name varchar not null,
+  category varchar not null,
+  unique (term_name, category)
+);
+
 -- migrate:down
 
 drop materialized view if exists app_public_v2.gene_set_pmid cascade;

@@ -2,14 +2,13 @@
 
 create type app_public_v2.enriched_term_result as (
   term varchar,
-  count int,
-  odds_ratio double precision,
+  statistic double precision,
   pvalue double precision,
   adj_pvalue double precision,
-  not_term_count int,
-  total_term_count int,
-  total_not_term_count int
+  count int,
+  total_term_count int
 );
+
 
 drop type app_public_v2.paginated_enrich_result cascade;
 
@@ -19,29 +18,6 @@ create type app_public_v2.paginated_enrich_result as (
   enriched_terms varchar[]
 );
 
-create materialized view app_public_v2.gse_attrs_terms_count_human as
-select count(llm_elts) as llm_attrs_total,
-       count(pubmed_elts) as pubmed_attrs_total,
-       count(mesh_elts) as mesh_attrs_total
-from (
-  select unnest(llm_attrs) as llm_elts,
-         unnest(pubmed_attrs) as pubmed_elts,
-         unnest(mesh_attrs) as mesh_elts
-  from app_public_v2.gse_terms
-  where species = 'human'
-) subquery;
-
-create materialized view app_public_v2.gse_attrs_terms_count_mouse as
-select count(llm_elts) as llm_attrs_total,
-       count(pubmed_elts) as pubmed_attrs_total,
-       count(mesh_elts) as mesh_attrs_total
-from (
-  select unnest(llm_attrs) as llm_elts,
-         unnest(pubmed_attrs) as pubmed_elts,
-         unnest(mesh_attrs) as mesh_elts
-  from app_public_v2.gse_terms
-  where species = 'mouse'
-) subquery;
 
 create materialized view app_public_v2.llm_attrs_term_counts_human as
 select elts as term, count(elts) as term_count
@@ -99,37 +75,38 @@ group by elts;
 
 create or replace function app_private_v2.enrich_functional_terms(
     concat_terms varchar[], source_type varchar, species varchar) returns app_public_v2.enriched_term_result[] as $$
-    from scipy.stats import fisher_exact
+    from scipy.stats import kstest
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
     import math
+    rank_dict = {}
 
-    total_count = plpy.execute(f"SELECT {source_type}_total FROM app_public_v2.gse_attrs_terms_count_{species}")[0][f'{source_type}_total']
-    total_documents = plpy.execute(f"SELECT count(gse) as gse_count FROM app_public_v2.gse_terms where species = '{species}'")[0][f'gse_count']
+    if concat_terms is None:
+        return []
 
-    term_counter = Counter(concat_terms)
-    term_counts = list(term_counter.items())
-    total_enrich_term_count = sum(term_counter.values())
+    for i, term in enumerate(concat_terms):
+        if term not in rank_dict:
+            rank_dict[term] = []
+        rank_dict[term].append(i)
+      
 
     results = []
     p_values = []
-    for term, count in term_counts:
+    for term in rank_dict:
+      if len(rank_dict[term]) < 5:
+          continue
       try:
+        statistic, pvalue = kstest(rank_dict[term], 'uniform', args=(0, 9999), alternative='greater')
+        p_values.append(pvalue)
         escaped_term = term.replace("'", "''")
         term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts_{species} WHERE term = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
-        contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
-        odds_ratio, p_value = fisher_exact(contingency_table)
-        #p_value = (1 / math.log((total_documents/total_count) + 1)) * p_value
-        p_values.append(p_value)
         results.append({
             'term': term,
-            'count': count,
-            'odds_ratio': odds_ratio,
-            'pvalue': p_value,
-            'not_term_count': total_enrich_term_count - count,
-            'total_term_count': total_term_count,
-            'total_not_term_count': total_count - total_term_count
+            'statistic': statistic,
+            'pvalue': pvalue,
+            'count': len(rank_dict[term]),
+            'total_term_count': total_term_count
         })
       except Exception as e:
         print(e)
@@ -218,8 +195,8 @@ create or replace function app_private_v2.indexed_enrich(
     gse = term.split('-')[0]
     if gse not in gses:
       gses.add(gse)
-      enriched_terms_top_gses.append(term)
-    if len(enriched_terms_top_gses) >= 1000:
+      enriched_terms_top_gses.append(gse)
+    if len(enriched_terms_top_gses) >= 10000:
       break
   return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
 $$ language plpython3u immutable parallel safe;
@@ -251,20 +228,6 @@ as $$
 $$ language sql immutable parallel safe security definer;
 grant execute on function app_public_v2.background_enrich to guest, authenticated;
 
-/* create or replace function app_public_v2.get_term_gses(gses varchar[], term varchar, organism varchar) 
-returns setof varchar AS $$
-  select gse
-  from app_public_v2.gse_terms
-  where gse = ANY(gses)
-  and species = organism
-  and (
-    term = ANY(llm_attrs) OR
-    term = ANY(pubmed_attrs) OR
-    term = ANY(mesh_attrs)
-  );
-$$ language sql immutable strict parallel safe;
-grant execute on function app_public_v2.get_term_gses to guest, authenticated;
-grant select on table app_public_v2.gse_terms to guest, authenticated; */
 alter table app_public_v2.gse_info drop column gse_attrs cascade;
 alter table app_public_v2.gse_info add column gse_attrs varchar;
 UPDATE app_public_v2.gse_info gi
@@ -334,11 +297,12 @@ grant execute on function app_public_v2.gene_set_term_search to guest, authentic
 drop function app_public_v2.background_enrich;
 drop function app_private_v2.indexed_enrich;
 drop type app_public_v2.enriched_term_result cascade;
-drop materialized view app_public_v2.gse_attrs_terms_count_human;
+drop materialized view app_public_v2.gene_set_pmid cascade;
+
 drop materialized view app_public_v2.llm_attrs_term_counts_human;
 drop materialized view app_public_v2.pubmed_attrs_term_counts_human;
 drop materialized view app_public_v2.mesh_attrs_term_counts_human;
-drop materialized view app_public_v2.gse_attrs_terms_count_mouse;
+
 drop materialized view app_public_v2.llm_attrs_term_counts_mouse;
 drop materialized view app_public_v2.pubmed_attrs_term_counts_mouse;
 drop materialized view app_public_v2.mesh_attrs_term_counts_mouse;

@@ -20,6 +20,7 @@
     "@visx/text": "^3.3.0",
     "@visx/wordcloud": "^3.3.0",
     "autoprefixer": "10.4.14",
+    "axios": "^1.6.8",
     "chart.js": "^4.4.1",
     "classnames": "^2.3.2",
     "d3-svg-to-png": "^0.3.1",

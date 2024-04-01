@@ -98,13 +98,11 @@ COMMENT ON TYPE app_public_v2.enrich_result IS '@foreign key (gene_set_id) refer
 
 CREATE TYPE app_public_v2.enriched_term_result AS (
 	term character varying,
-	count integer,
-	odds_ratio double precision,
+	statistic double precision,
 	pvalue double precision,
 	adj_pvalue double precision,
-	not_term_count integer,
-	total_term_count integer,
-	total_not_term_count integer
+	count integer,
+	total_term_count integer
 );
 
 
@@ -126,37 +124,38 @@ CREATE TYPE app_public_v2.paginated_enrich_result AS (
 CREATE FUNCTION app_private_v2.enrich_functional_terms(concat_terms character varying[], source_type character varying, species character varying) RETURNS app_public_v2.enriched_term_result[]
     LANGUAGE plpython3u IMMUTABLE
     AS $$
-    from scipy.stats import fisher_exact
+    from scipy.stats import kstest
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
     import math
+    rank_dict = {}
 
-    total_count = plpy.execute(f"SELECT {source_type}_total FROM app_public_v2.gse_attrs_terms_count_{species}")[0][f'{source_type}_total']
-    total_documents = plpy.execute(f"SELECT count(gse) as gse_count FROM app_public_v2.gse_terms where species = '{species}'")[0][f'gse_count']
+    if concat_terms is None:
+        return []
 
-    term_counter = Counter(concat_terms)
-    term_counts = list(term_counter.items())
-    total_enrich_term_count = sum(term_counter.values())
+    for i, term in enumerate(concat_terms):
+        if term not in rank_dict:
+            rank_dict[term] = []
+        rank_dict[term].append(i)
+
 
     results = []
     p_values = []
-    for term, count in term_counts:
+    for term in rank_dict:
+      if len(rank_dict[term]) < 5:
+          continue
       try:
+        statistic, pvalue = kstest(rank_dict[term], 'uniform', args=(0, 9999), alternative='greater')
+        p_values.append(pvalue)
         escaped_term = term.replace("'", "''")
         term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts_{species} WHERE term = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
-        contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
-        odds_ratio, p_value = fisher_exact(contingency_table)
-        #p_value = (1 / math.log((total_documents/total_count) + 1)) * p_value
-        p_values.append(p_value)
         results.append({
             'term': term,
-            'count': count,
-            'odds_ratio': odds_ratio,
-            'pvalue': p_value,
-            'not_term_count': total_enrich_term_count - count,
-            'total_term_count': total_term_count,
-            'total_not_term_count': total_count - total_term_count
+            'statistic': statistic,
+            'pvalue': pvalue,
+            'count': len(rank_dict[term]),
+            'total_term_count': total_term_count
         })
       except Exception as e:
         print(e)
@@ -230,8 +229,8 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
     gse = term.split('-')[0]
     if gse not in gses:
       gses.add(gse)
-      enriched_terms_top_gses.append(term)
-    if len(enriched_terms_top_gses) >= 1000:
+      enriched_terms_top_gses.append(gse)
+    if len(enriched_terms_top_gses) >= 10000:
       break
   return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
 $$;

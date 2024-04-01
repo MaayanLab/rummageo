@@ -24,8 +24,8 @@ query FetchUserGeneSet($id: UUID!) {
   }
 }
 
-# Perform enrichment analysis against a specific library
-query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int = 0, $first: Int = 10, $id: UUID!, $filterScoreLe: Float = -1.1) {
+
+query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int = 0, $first: Int = 10, $id: UUID!, $filterScoreLe: Float = -1.1, $adjPvalue: Float = 0.05) {
   background(id: $id) {
     id
     species
@@ -35,6 +35,7 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
       offset: $offset
       first: $first
       filterScoreLe: $filterScoreLe
+      adjPvalueLe: $adjPvalue
     ) {
       nodes {
         pvalue
@@ -56,6 +57,7 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
               title
               gseAttrs
               silhouetteScore
+              term
             }
           }
         }
@@ -67,17 +69,16 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
 }
 
 
+
 # Perform term enrichment analysis against a specific set of terms ("llm_attrs", "mesh_attrs", "pubmed_attrs")
 query TermEnrichment($enrichedTerms: [String], $sourceType: String = "llm_attrs", $species: String = "human") {
   enrichedFunctionalTerms(enrichedTerms: $enrichedTerms, sourceType: $sourceType organism: $species) {
     adjPvalue
     count
-    oddsRatio
-    notTermCount
+    totalTermCount
     pvalue
     term
-    totalNotTermCount
-    totalTermCount
+    statistic
   }
 }
 
@@ -212,5 +213,11 @@ query GetPmidInfo($pmids: [String]! = ["33378647"]) {
       doi
     }
     totalCount
+  }
+}
+
+query QueryGseSummary($id: UUID!) {
+  gseInfo(id: $id) {
+    summary
   }
 }
