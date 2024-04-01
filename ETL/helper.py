@@ -180,6 +180,20 @@ def import_gse_attrs(plpy, species='human'):
       plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs, species))
 
 
+def import_term_categories(plpy):
+  import pandas as pd
+  from tqdm import tqdm
+
+  df = pd.read_csv('data/LLM_keyterm_categories.csv')
+
+  copy_from_records(
+    plpy.conn, 'app_public_v2.term_categories', ('term_name', 'category',),
+    (
+      dict(term_name=row['term'], category=row['manual_category'])
+      for _, row in tqdm(df.iterrows(), desc='Inserting term categories...', total=len(df))
+    ),
+  )
+
 
 def import_gse_info(plpy, species='human'):
   import GEOparse
@@ -463,6 +477,17 @@ def ingest_gse_attrs(species):
   from plpy import plpy
   try:
     import_gse_attrs(plpy, species)
+  except:
+    plpy.conn.rollback()
+    raise
+  else:
+    plpy.conn.commit()
+
+@cli.command()
+def ingest_term_categories():
+  from plpy import plpy
+  try:
+    import_term_categories(plpy)
   except:
     plpy.conn.rollback()
     raise

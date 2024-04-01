@@ -19,93 +19,45 @@ create type app_public_v2.paginated_enrich_result as (
   enriched_terms varchar[]
 );
 
-create materialized view app_public_v2.gse_attrs_terms_count_human as
-select count(llm_elts) as llm_attrs_total,
-       count(pubmed_elts) as pubmed_attrs_total,
-       count(mesh_elts) as mesh_attrs_total
-from (
-  select unnest(llm_attrs) as llm_elts,
-         unnest(pubmed_attrs) as pubmed_elts,
-         unnest(mesh_attrs) as mesh_elts
-  from app_public_v2.gse_terms
-  where species = 'human'
-) subquery;
+create materialized view app_public_v2.category_total_count as
+select category, count(term_name) as term_total
+from app_public_v2.term_categories
+group by category;
 
-create materialized view app_public_v2.gse_attrs_terms_count_mouse as
-select count(llm_elts) as llm_attrs_total,
-       count(pubmed_elts) as pubmed_attrs_total,
-       count(mesh_elts) as mesh_attrs_total
+create materialized view app_public_v2.terms_count_mouse as
+select terms, COUNT(terms) as term_count
 from (
-  select unnest(llm_attrs) as llm_elts,
-         unnest(pubmed_attrs) as pubmed_elts,
-         unnest(mesh_attrs) as mesh_elts
-  from app_public_v2.gse_terms
-  where species = 'mouse'
-) subquery;
-
-create materialized view app_public_v2.llm_attrs_term_counts_human as
-select elts as term, count(elts) as term_count
-from (
-  select unnest(llm_attrs) as elts
-  from app_public_v2.gse_terms
-  where species = 'human'
-) subquery
-group by elts;
-
-create materialized view app_public_v2.pubmed_attrs_term_counts_human as
-select elts as term, count(elts) as term_count
-from (
-  select unnest(pubmed_attrs) as elts
-  from app_public_v2.gse_terms
-  where species = 'human'
-) subquery
-group by elts;
-
-create materialized view app_public_v2.mesh_attrs_term_counts_human as
-select elts as term, count(elts) as term_count
-from (
-  select unnest(mesh_attrs) as elts
-  from app_public_v2.gse_terms
-  where species = 'human'
-) subquery
-group by elts;
-
-create materialized view app_public_v2.llm_attrs_term_counts_mouse as
-select elts as term, count(elts) as term_count
-from (
-  select unnest(llm_attrs) as elts
+  select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
   from app_public_v2.gse_terms
   where species = 'mouse'
 ) subquery
-group by elts;
+group by terms;
 
-create materialized view app_public_v2.pubmed_attrs_term_counts_mouse as
-select elts as term, count(elts) as term_count
+create materialized view app_public_v2.terms_count_human as
+select terms, COUNT(terms) as term_count
 from (
-  select unnest(pubmed_attrs) as elts
+  select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
   from app_public_v2.gse_terms
-  where species = 'mouse'
+  where species = 'human'
 ) subquery
-group by elts;
+group by terms;
 
-create materialized view app_public_v2.mesh_attrs_term_counts_mouse as
-select elts as term, count(elts) as term_count
-from (
-  select unnest(mesh_attrs) as elts
-  from app_public_v2.gse_terms
-  where species = 'mouse'
-) subquery
-group by elts;
 
 create or replace function app_private_v2.enrich_functional_terms(
-    concat_terms varchar[], source_type varchar, species varchar) returns app_public_v2.enriched_term_result[] as $$
+    terms_concat varchar[], source_type varchar, species varchar) returns app_public_v2.enriched_term_result[] as $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
     import math
 
-    total_count = plpy.execute(f"SELECT {source_type}_total FROM app_public_v2.gse_attrs_terms_count_{species}")[0][f'{source_type}_total']
-    total_documents = plpy.execute(f"SELECT count(gse) as gse_count FROM app_public_v2.gse_terms where species = '{species}'")[0][f'gse_count']
+    if terms_concat is None or not terms_concat:
+      return []
+
+    category_terms = plpy.execute(f"SELECT term_name FROM app_public_v2.term_categories WHERE category = '{source_type}'")
+    category_terms = set(map(lambda t: t['term_name'], category_terms))
+    total_count = plpy.execute(f"SELECT term_total FROM app_public_v2.category_total_count WHERE category = '{source_type}'")[0]['term_total']
+
+    concat_terms = list(filter(lambda t: t in category_terms, terms_concat))
 
     term_counter = Counter(concat_terms)
     term_counts = list(term_counter.items())
@@ -116,8 +68,12 @@ create or replace function app_private_v2.enrich_functional_terms(
     for term, count in term_counts:
       try:
         escaped_term = term.replace("'", "''")
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.{source_type}_term_counts_{species} WHERE term = '{escaped_term}'")
+        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.terms_count_{species} WHERE terms = '{escaped_term}'")
         total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
+        a = count
+        b = total_enrich_term_count - count
+        c = total_term_count
+        d = total_count - total_term_count
         contingency_table = [[count, total_enrich_term_count - count], [total_term_count, total_count - total_term_count]]
         odds_ratio, p_value = fisher_exact(contingency_table)
         #p_value = (1 / math.log((total_documents/total_count) + 1)) * p_value
@@ -162,13 +118,7 @@ create or replace function app_public_v2.enriched_functional_terms(
     -- Get list of functional terms based on the source_type
     select array_agg(terms) as terms
     from (
-      select unnest(
-        case 
-          when source_type = 'llm_attrs' then llm_attrs
-          when source_type = 'pubmed_attrs' then pubmed_attrs
-          when source_type = 'mesh_attrs' then mesh_attrs
-        end
-      ) as terms
+      select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
       from app_public_v2.gse_terms
       where gse in (select id from gse_ids) and species = organism
     ) subquery
@@ -219,7 +169,7 @@ create or replace function app_private_v2.indexed_enrich(
     if gse not in gses:
       gses.add(gse)
       enriched_terms_top_gses.append(term)
-    if len(enriched_terms_top_gses) >= 1000:
+    if len(enriched_terms_top_gses) >= 10000:
       break
   return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
 $$ language plpython3u immutable parallel safe;
@@ -334,12 +284,8 @@ grant execute on function app_public_v2.gene_set_term_search to guest, authentic
 drop function app_public_v2.background_enrich;
 drop function app_private_v2.indexed_enrich;
 drop type app_public_v2.enriched_term_result cascade;
-drop materialized view app_public_v2.gse_attrs_terms_count_human;
-drop materialized view app_public_v2.llm_attrs_term_counts_human;
-drop materialized view app_public_v2.pubmed_attrs_term_counts_human;
-drop materialized view app_public_v2.mesh_attrs_term_counts_human;
-drop materialized view app_public_v2.gse_attrs_terms_count_mouse;
-drop materialized view app_public_v2.llm_attrs_term_counts_mouse;
-drop materialized view app_public_v2.pubmed_attrs_term_counts_mouse;
-drop materialized view app_public_v2.mesh_attrs_term_counts_mouse;
+
+drop materialized view app_public_v2.category_total_count;
+drop materialized view app_public_v2.terms_count_human;
+drop materialized view app_public_v2.terms_count_mouse;
 

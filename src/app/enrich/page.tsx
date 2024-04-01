@@ -71,7 +71,7 @@ function EnrichmentResults({
     [genes]
   );
   const [tab, setTab] = React.useState(1);
-  const [sourceType, setSourceType] = React.useState("llm_attrs");
+  const [sourceType, setSourceType] = React.useState("A");
 
   const { data: backgrounds } = useGetBackgroundsQuery();
   var backgroundIds: Record<string, string> = {};

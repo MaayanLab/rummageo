@@ -125,21 +125,31 @@ export default function TermVis({
       <div className="mx-auto min-h-full h-fit w-10/12">
         <p className="font-light mb-3">Functional term signfigance for the top 1000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
         <div className="flex gap-3">
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'llm_attrs'})}
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'A'})}
           onClick={() => {
-            setSourceType('llm_attrs')
+            setSourceType('A')
             setCurrentPage(1)
-          }}>LLM Extracted Terms</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'pubmed_attrs'})}
+          }}>A</button>
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'B'})}
           onClick={() => {
-            setSourceType('pubmed_attrs')
+            setSourceType('B')
             setCurrentPage(1)
-          }}>PubMed Keywords</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'mesh_attrs'})}
+          }}>B</button>
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'C'})}
           onClick={() => {
-            setSourceType('mesh_attrs')
+            setSourceType('C')
             setCurrentPage(1)
-            }}>MeSH Terms</button>
+            }}>C</button>
+          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'D'})}
+          onClick={() => {
+            setSourceType('D')
+            setCurrentPage(1)
+            }}>D</button>
+            <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'E'})}
+          onClick={() => {
+            setSourceType('E')
+            setCurrentPage(1)
+            }}>E</button>
         </div>
         <button
           className="float-right m-3"
