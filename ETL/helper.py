@@ -157,7 +157,7 @@ def import_gse_attrs(plpy, species='human'):
 
   to_ingest = list(set(to_ingest))
   
-  with open(f'data/{species}_keyterm_library_gse_llm.json') as f:
+  with open(f'data/{species}_keyterm_library_filtered.json') as f:
     gse_attrs = json.load(f)
   
 

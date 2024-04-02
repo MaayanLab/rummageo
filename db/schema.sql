@@ -377,7 +377,7 @@ CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character
     -- Get list of functional terms based on the source_type
     select array_agg(terms) as terms
     from (
-      select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
+      select unnest(llm_attrs) as terms
       from app_public_v2.gse_terms
       where gse in (select id from gse_ids) and species = organism
     ) subquery
@@ -814,7 +814,7 @@ COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2
 CREATE MATERIALIZED VIEW app_public_v2.terms_count_human AS
  SELECT subquery.terms,
     count(subquery.terms) AS term_count
-   FROM ( SELECT unnest(((gse_terms.llm_attrs || gse_terms.pubmed_attrs) || gse_terms.mesh_attrs)) AS terms
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
            FROM app_public_v2.gse_terms
           WHERE ((gse_terms.species)::text = 'human'::text)) subquery
   GROUP BY subquery.terms
@@ -828,7 +828,7 @@ CREATE MATERIALIZED VIEW app_public_v2.terms_count_human AS
 CREATE MATERIALIZED VIEW app_public_v2.terms_count_mouse AS
  SELECT subquery.terms,
     count(subquery.terms) AS term_count
-   FROM ( SELECT unnest(((gse_terms.llm_attrs || gse_terms.pubmed_attrs) || gse_terms.mesh_attrs)) AS terms
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
            FROM app_public_v2.gse_terms
           WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
   GROUP BY subquery.terms

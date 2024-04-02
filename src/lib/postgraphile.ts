@@ -15,6 +15,7 @@ export default postgraphile(
     disableDefaultMutations: true,
     ignoreRBAC: false,
     ignoreIndexes: false,
+    bodySizeLimit: '50mb',
     extendedErrors: process.env.NODE_ENV === 'production' ? ['errcode'] : ['hint', 'detail', 'errcode'],
     showErrorStack: process.env.NODE_ENV === 'production' ? undefined : 'json',
     appendPlugins: [require("@graphile-contrib/pg-simplify-inflector")],

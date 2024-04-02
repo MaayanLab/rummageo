@@ -123,33 +123,33 @@ export default function TermVis({
     {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
-        <p className="font-light mb-3">Functional term signfigance for the top 1000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
+        <p className="font-light mb-3">Functional term signfigance for the top 10,000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
         <div className="flex gap-3">
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'A'})}
           onClick={() => {
             setSourceType('A')
             setCurrentPage(1)
-          }}>A</button>
+          }}>Disease/Phenotype</button>
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'B'})}
           onClick={() => {
             setSourceType('B')
             setCurrentPage(1)
-          }}>B</button>
+          }}>Biomolecules</button>
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'C'})}
           onClick={() => {
             setSourceType('C')
             setCurrentPage(1)
-            }}>C</button>
+            }}>Tissue/Cell</button>
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'D'})}
           onClick={() => {
             setSourceType('D')
             setCurrentPage(1)
-            }}>D</button>
+            }}>Pathway/Biological Process</button>
             <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'E'})}
           onClick={() => {
             setSourceType('E')
             setCurrentPage(1)
-            }}>E</button>
+            }}>Assay/Models</button>
         </div>
         <button
           className="float-right m-3"

@@ -27,7 +27,7 @@ group by category;
 create materialized view app_public_v2.terms_count_mouse as
 select terms, COUNT(terms) as term_count
 from (
-  select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
+  select unnest(llm_attrs) as terms
   from app_public_v2.gse_terms
   where species = 'mouse'
 ) subquery
@@ -36,7 +36,7 @@ group by terms;
 create materialized view app_public_v2.terms_count_human as
 select terms, COUNT(terms) as term_count
 from (
-  select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
+  select unnest(llm_attrs) as terms
   from app_public_v2.gse_terms
   where species = 'human'
 ) subquery
@@ -118,7 +118,7 @@ create or replace function app_public_v2.enriched_functional_terms(
     -- Get list of functional terms based on the source_type
     select array_agg(terms) as terms
     from (
-      select unnest(llm_attrs || pubmed_attrs || mesh_attrs) as terms
+      select unnest(llm_attrs) as terms
       from app_public_v2.gse_terms
       where gse in (select id from gse_ids) and species = organism
     ) subquery
