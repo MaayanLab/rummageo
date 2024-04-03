@@ -67,10 +67,12 @@ export interface WordData {
 
 export default function EnrichrTermVis({
   enrichedTerms,
-  setFilterTerm
+  setFilterTerm,
+  setTab
 }: {
   enrichedTerms: EnrichrResult[] | undefined,
   setFilterTerm: Function,
+  setTab: React.Dispatch<React.SetStateAction<number>>,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const entriesPerPage = 10;
@@ -215,6 +217,7 @@ export default function EnrichrTermVis({
                 <td>
                   <a className="link" onClick={() => {
                     setFilterTerm({page: "1", q: row.term})
+                    setTab(1)
                   }
                   }>
                     <div className="tooltip tooltip-right underline" data-tip={`View enriched signatures which mention ${row.term}`}>

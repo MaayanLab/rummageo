@@ -168,12 +168,13 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
                 let attrs: String = row.try_get("gse_attrs").unwrap();
-                let sig_terms: String = row.try_get("sig_terms").unwrap();
+                let sig_terms: Vec<String> = row.try_get("sig_terms").unwrap();
+                let sig_terms_str = sig_terms.join(" ");
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
                 let bitset = bitvec(&bitmap.columns, gene_ids);
-                bitmap.values.push((gene_set_id, term, title, attrs, sig_terms, silhouette_score, bitset));
+                bitmap.values.push((gene_set_id, term, title, attrs, sig_terms_str, silhouette_score, bitset));
                 future::ready(())
             })
             .await;
@@ -352,7 +353,7 @@ async fn query(
         .filter_map(|result| {
             let (gene_set_id, gene_set_term, title, attrs, sig_terms, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
             if let Some(filter_term) = &filter_term {
-                if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) && !attrs.contains(filter_term) && !sig_terms.contains(filter_term) { 
+                if !title.to_lowercase().contains(filter_term) && !gene_set_term.to_lowercase().contains(filter_term) && !attrs.contains(filter_term) && !sig_terms.to_lowercase().contains(filter_term) { 
                     return None 
                 }
 

@@ -24,6 +24,7 @@ import GeneSetModal from "@/components/geneSetModal";
 import TermVis from "@/components/termVis";
 import EnrichrTermVis from "@/components/enrichrTermVis";
 import SamplesModal from "@/components/samplesModal";
+import EnrichrModal from "@/components/enrichrModal";
 import partition from "@/utils/partition";
 import { FaInfo, FaSearch } from "react-icons/fa";
 import { TiDeleteOutline } from "react-icons/ti";
@@ -60,12 +61,14 @@ function EnrichmentResults({
   setModalHypothesis,
   setModalSamples,
   setModalCondition,
+  setModalEnrichr
 }: {
   userGeneSet?: FetchUserGeneSetQuery;
   setModalGeneSet: React.Dispatch<React.SetStateAction<GeneSetModalT>>;
   setModalHypothesis: React.Dispatch<React.SetStateAction<GeneSetModalT>>;
   setModalSamples: React.Dispatch<React.SetStateAction<string[] | undefined>>;
   setModalCondition: React.Dispatch<React.SetStateAction<string | undefined>>;
+  setModalEnrichr: React.Dispatch<React.SetStateAction<GeneSetModalT>>;
 }) {
   const genes = React.useMemo(
     () =>
@@ -137,8 +140,6 @@ function EnrichmentResults({
       species: species,
     },
   });
-
-  console.log(topEnrichedSigs)
 
   const { data: EnrichrTermEnrichmentResults } = useEnrichrTermEnrichmentQuery({
     variables: {
@@ -354,6 +355,7 @@ function EnrichmentResults({
                     <th>AdjPValue</th>
                     <th className="hidden  2xl:table-cell">Silhouette Score</th>
                     <th>Hypothesis</th>
+                    <th>Enrichr Terms</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -364,7 +366,7 @@ function EnrichmentResults({
                         enrichmentResult?.geneSet?.term
                       );
 
-                      const m = term;
+                      const term = enrichmentResult?.geneSet?.term;
                       var pmid =
                         enrichmentResult?.geneSet?.geneSetPmidsById?.nodes[0]
                           ?.pmid ?? null;
@@ -650,6 +652,29 @@ function EnrichmentResults({
                               </button>
                             </div>
                           </td>
+                          <td>
+                            <div
+                              className="tooltip tooltip-left"
+                              data-tip="Generate GPT-4 Hypothesis"
+                            >
+                              <button
+                                className="btn btn-sm"
+                                onClick={(evt) => {
+                                  console.log(term)
+                                  setModalEnrichr({
+                                    type: "GeneSet",
+                                    id: enrichmentResult?.geneSet?.id,
+                                    description: term ?? "",
+                                  });
+                                }}
+                              >
+                                <img
+                                  src="/images/enrichr-icon.png"
+                                  alt="Enrichr"
+                                  className="h-6 w-6"/>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     }
@@ -697,6 +722,7 @@ function EnrichmentResults({
             EnrichrTermEnrichmentResults?.enrichedEnrichrTerms as EnrichrResult[]
           }
           setFilterTerm={setQueryString}
+          setTab={setTab}
         />
       ) : (
         <></>
@@ -741,6 +767,32 @@ function GeneSetModalWrapper(props: {
           ? props.modalGeneSet.genes
           : undefined
       }
+      setShowModal={(show) => {
+        if (!show) props.setModalGeneSet(undefined);
+      }}
+    />
+  );
+}
+
+function EnrichrModalWrapper(props: {
+  modalGeneSet: GeneSetModalT;
+  setModalGeneSet: React.Dispatch<React.SetStateAction<GeneSetModalT>>;
+}) {
+  const { data: geneSet } = useViewGeneSetQuery({
+    skip: props.modalGeneSet?.type !== "GeneSet",
+    variables:
+      props.modalGeneSet?.type === "GeneSet"
+        ? {
+            id: props.modalGeneSet.id,
+          }
+        : undefined,
+  });
+  console.log(props.modalGeneSet?.description)
+  return (
+    <EnrichrModal
+      term={props.modalGeneSet?.description}
+      geneset={geneSet?.geneSet?.genes.nodes.map((gene) => gene.symbol)}
+      showModal={props.modalGeneSet !== undefined}
       setShowModal={(show) => {
         if (!show) props.setModalGeneSet(undefined);
       }}
@@ -810,6 +862,7 @@ export default function Enrich({
   });
   const [modalGeneSet, setModalGeneSet] = React.useState<GeneSetModalT>();
   const [modalHypothesis, setModalHypothesis] = React.useState<GeneSetModalT>();
+  const [modalEnrichr, setModalEnrichr] = React.useState<GeneSetModalT>();
   const [modalSamples, setModalSamples] = React.useState<string[]>();
   const [modalCondition, setModalCondition] = React.useState<string>();
 
@@ -842,6 +895,7 @@ export default function Enrich({
         setModalSamples={setModalSamples}
         setModalCondition={setModalCondition}
         setModalHypothesis={setModalHypothesis}
+        setModalEnrichr={setModalEnrichr}
       />
       <SamplesModalWrapper
         samples={modalSamples ?? []}
@@ -855,6 +909,10 @@ export default function Enrich({
       <HypothesisModalWrapper
         modalGeneSet={modalHypothesis}
         setModalGeneSet={setModalHypothesis}
+      />
+      <EnrichrModalWrapper
+        modalGeneSet={modalEnrichr}
+        setModalGeneSet={setModalEnrichr}
       />
     </>
   );

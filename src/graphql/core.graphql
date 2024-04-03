@@ -231,3 +231,9 @@ query QueryGseSummary($id: UUID!) {
     summary
   }
 }
+
+query EnrichrStats($organism: String!, $sig: String!) {
+  enrichrTermBySigAndOrganism(organism: $organism, sig: $sig) {
+    enrichrStats
+  }
+}
