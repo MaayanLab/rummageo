@@ -167,9 +167,9 @@ create or replace function app_private_v2.indexed_enrich(
   for term in enriched_terms:
     gse = term.split('-')[0]
     if gse not in gses:
-      gses.add(gse)
+      gses.add(term)
       enriched_terms_top_gses.append(term)
-    if len(enriched_terms_top_gses) >= 10000:
+    if len(enriched_terms_top_gses) >= 5000:
       break
   return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
 $$ language plpython3u immutable parallel safe;
@@ -201,20 +201,7 @@ as $$
 $$ language sql immutable parallel safe security definer;
 grant execute on function app_public_v2.background_enrich to guest, authenticated;
 
-/* create or replace function app_public_v2.get_term_gses(gses varchar[], term varchar, organism varchar) 
-returns setof varchar AS $$
-  select gse
-  from app_public_v2.gse_terms
-  where gse = ANY(gses)
-  and species = organism
-  and (
-    term = ANY(llm_attrs) OR
-    term = ANY(pubmed_attrs) OR
-    term = ANY(mesh_attrs)
-  );
-$$ language sql immutable strict parallel safe;
-grant execute on function app_public_v2.get_term_gses to guest, authenticated;
-grant select on table app_public_v2.gse_terms to guest, authenticated; */
+
 alter table app_public_v2.gse_info drop column gse_attrs cascade;
 alter table app_public_v2.gse_info add column gse_attrs varchar;
 UPDATE app_public_v2.gse_info gi
@@ -279,6 +266,14 @@ as $$
   inner join unnest(terms) ut(term) on gs.title ilike ('%' || ut.term || '%');
 $$ language sql immutable strict parallel safe;
 grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
+
+create table app_public_v2.enrichr_terms (
+  sig varchar not null,
+  organism varchar not null,
+  sig_terms varchar[],
+  enrichr_stats jsonb,
+  unique(sig, organism)
+);
 
 -- migrate:down
 drop function app_public_v2.background_enrich;

@@ -109,13 +109,26 @@ CREATE TYPE app_public_v2.enriched_term_result AS (
 
 
 --
+-- Name: enrichr_result; Type: TYPE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TYPE app_public_v2.enrichr_result AS (
+	term character varying,
+	pvalue double precision,
+	adj_pvalue double precision,
+	count integer
+);
+
+
+--
 -- Name: paginated_enrich_result; Type: TYPE; Schema: app_public_v2; Owner: -
 --
 
 CREATE TYPE app_public_v2.paginated_enrich_result AS (
 	nodes app_public_v2.enrich_result[],
 	total_count integer,
-	enriched_terms character varying[]
+	enriched_terms character varying[],
+	top_enriched_sigs character varying[]
 );
 
 
@@ -236,14 +249,79 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
   enriched_terms = req_json.pop('terms')
   gses = set()
   enriched_terms_top_gses = []
-  for term in enriched_terms:
+  enriched_terms_top_sigs = []
+  for i, term in enumerate(enriched_terms):
+    if i < 500:
+        enriched_terms_top_sigs.append(term.replace('.tsv', ''))
     gse = term.split('-')[0]
     if gse not in gses:
       gses.add(gse)
       enriched_terms_top_gses.append(term)
-    if len(enriched_terms_top_gses) >= 10000:
+    if len(enriched_terms_top_gses) >= 5000:
       break
-  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses)
+  return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses, top_enriched_sigs=enriched_terms_top_sigs)
+$$;
+
+
+--
+-- Name: sig_enrichr_terms(jsonb, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
+--
+
+CREATE FUNCTION app_private_v2.sig_enrichr_terms(concat_terms jsonb, species character varying) RETURNS app_public_v2.enrichr_result[]
+    LANGUAGE plpython3u IMMUTABLE
+    AS $$
+    from scipy.stats import kstest
+    from statsmodels.stats.multitest import multipletests
+    from collections import Counter
+    import json
+
+    import math
+    rank_dict = {}
+
+    if concat_terms is None:
+        return []
+
+    concat_terms_json = json.loads(concat_terms)
+
+    for rank in concat_terms_json:
+        for term in concat_terms_json[rank]:
+            if term not in rank_dict:
+                rank_dict[term] = []
+            rank_dict[term].append(int(rank))
+
+    results = []
+    p_values = []
+    for term in rank_dict:
+      if len(rank_dict[term]) < 5:
+          continue
+      try:
+        statistic, pvalue = kstest(rank_dict[term], 'uniform', args=(0, 500), alternative='greater')
+        p_values.append(pvalue)
+        escaped_term = term.replace("'", "''")
+        results.append({
+            'term': term,
+            'statistic': statistic,
+            'pvalue': pvalue,
+            'count': len(rank_dict[term]),
+        })
+      except Exception as e:
+        print(e)
+        continue
+    try:
+        adjusted_p_values = multipletests(p_values, method='fdr_bh')[1]
+        for i in range(len(results)):
+            results[i]['adj_pvalue'] = adjusted_p_values[i]
+    except Exception as e:
+        print(e)
+        for i in range(len(results)):
+            results[i]['adj_pvalue'] = 1
+    sig_results = list(filter(lambda r: r['adj_pvalue'] < .05, results))
+
+    if len(sig_results) > 50:
+        results = list(sorted(sig_results, key=lambda r: r['adj_pvalue']))[:50]
+    else:
+        results = list(sorted(results, key=lambda r: r['pvalue']))[:100]
+    return results
 $$;
 
 
@@ -359,6 +437,27 @@ CREATE FUNCTION app_public_v2.enrich_result_gene_set(enrich_result app_public_v2
   select gs.*
   from app_public_v2.gene_set gs
   where gs.id = enrich_result.gene_set_id;
+$$;
+
+
+--
+-- Name: enriched_enrichr_terms(character varying[], character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.enriched_enrichr_terms(enriched_sigs character varying[], organism character varying) RETURNS app_public_v2.enrichr_result[]
+    LANGUAGE sql IMMUTABLE SECURITY DEFINER PARALLEL SAFE
+    AS $$
+with enriched_sigs_with_row_number as (
+    select enriched_sigs[i] as sig, i as rn
+    from generate_subscripts(enriched_sigs, 1) as i
+), enrichr_attrs AS (
+    SELECT jsonb_object_agg(es.rn::text, sig_terms) AS attrs
+    FROM app_public_v2.enrichr_terms et
+    JOIN enriched_sigs_with_row_number es ON REPLACE(et.sig, '.tsv', '') = es.sig and et.organism = organism
+    WHERE cardinality(sig_terms) > 0
+)
+-- Call the enrich_functional_terms function and order by row number
+select * from app_private_v2.sig_enrichr_terms((SELECT attrs FROM enrichr_attrs), organism)
 $$;
 
 
@@ -726,6 +825,18 @@ CREATE MATERIALIZED VIEW app_public_v2.category_total_count AS
 
 
 --
+-- Name: enrichr_terms; Type: TABLE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TABLE app_public_v2.enrichr_terms (
+    sig character varying NOT NULL,
+    organism character varying NOT NULL,
+    sig_terms character varying[],
+    enrichr_stats jsonb
+);
+
+
+--
 -- Name: gene_set_gse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
@@ -850,6 +961,14 @@ CREATE TABLE public.schema_migrations (
 
 ALTER TABLE ONLY app_public_v2.background
     ADD CONSTRAINT background_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: enrichr_terms enrichr_terms_sig_organism_key; Type: CONSTRAINT; Schema: app_public_v2; Owner: -
+--
+
+ALTER TABLE ONLY app_public_v2.enrichr_terms
+    ADD CONSTRAINT enrichr_terms_sig_organism_key UNIQUE (sig, organism);
 
 
 --
@@ -1134,4 +1253,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20231207235614'),
     ('20240202144258'),
     ('20240202163120'),
-    ('20240222152523');
+    ('20240222152523'),
+    ('20240403141754'),
+    ('20240403160325');

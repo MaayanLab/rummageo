@@ -62,6 +62,7 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
       }
       totalCount
       enrichedTerms
+      topEnrichedSigs
     }
   }
 }
@@ -78,6 +79,16 @@ query TermEnrichment($enrichedTerms: [String], $sourceType: String = "llm_attrs"
     term
     totalNotTermCount
     totalTermCount
+  }
+}
+
+# Perform term enrichment analysis against a specific set of terms ("llm_attrs", "mesh_attrs", "pubmed_attrs")
+query EnrichrTermEnrichment($enrichedSigs: [String], $species: String = "human") {
+  enrichedEnrichrTerms(enrichedSigs: $enrichedSigs, organism: $species) {
+    term
+    pvalue
+    adjPvalue
+    count
   }
 }
 
@@ -212,5 +223,11 @@ query GetPmidInfo($pmids: [String]! = ["33378647"]) {
       doi
     }
     totalCount
+  }
+}
+
+query QueryGseSummary($id: UUID!) {
+  gseInfo(id: $id) {
+    summary
   }
 }

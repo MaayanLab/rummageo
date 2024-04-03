@@ -161,7 +161,6 @@ def import_gse_attrs(plpy, species='human'):
     gse_attrs = json.load(f)
   
 
-
   for gse in tqdm(to_ingest):
     sql = """
         INSERT INTO app_public_v2.gse_terms (gse, llm_attrs, pubmed_attrs, mesh_attrs, species)
@@ -440,6 +439,42 @@ def import_pb_info(plpy):
     desc='Inserting new PubMed entries...'),
   )
 
+def replace_infinity_with_none(obj):
+    import math
+    if isinstance(obj, float) and math.isinf(obj):
+        return None
+    elif isinstance(obj, dict):
+        return {k: replace_infinity_with_none(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_infinity_with_none(elem) for elem in obj]
+    else:
+        return obj
+
+def import_enrichr_terms(plpy, species='human'):
+  import json
+  from tqdm import tqdm
+
+  with open(f'data/enrichr_terms_{species}.json') as f:
+    enrichr_terms = json.load(f)
+
+  for sig in tqdm(enrichr_terms):
+    sql = """
+        INSERT INTO app_public_v2.enrichr_terms (sig, organism, sig_terms, enrichr_stats)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (sig, organism) DO UPDATE SET
+        sig_terms = EXCLUDED.sig_terms,
+        enrichr_stats = EXCLUDED.enrichr_stats;
+        """
+    sig_name = list(sig.keys())[0]
+    enrichr_stats=json.dumps(replace_infinity_with_none(sig[list(sig.keys())[0]]))
+
+    sig_terms = []
+    for lib in sig[sig_name]:
+      sig_terms += [items[0] for items in sig[list(sig.keys())[0]][lib] if items[2] < 0.05]
+    plpy.execute(sql, (sig_name, species, sig_terms, enrichr_stats))
+
+
+
 @click.group()
 def cli(): pass
 @cli.command()
@@ -465,6 +500,18 @@ def ingest_gse_info(species):
   from plpy import plpy
   try:
     import_gse_info(plpy, species)
+  except:
+    plpy.conn.rollback()
+    raise
+  else:
+    plpy.conn.commit()
+
+@cli.command()
+@click.option('--species', type=str, default='human', help='Terms species')
+def ingest_enrichr_terms(species):
+  from plpy import plpy
+  try:
+    import_enrichr_terms(plpy, species)
   except:
     plpy.conn.rollback()
     raise

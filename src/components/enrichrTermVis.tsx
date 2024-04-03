@@ -1,4 +1,4 @@
-import { EnrichedTermResult } from "@/graphql";
+import { EnrichrResult } from "@/graphql";
 import { useState, useRef, useMemo } from "react";
 import Pagination from "@/components/pagination";
 import clientDownloadBlob from '@/utils/clientDownloadBlob';
@@ -65,17 +65,11 @@ export interface WordData {
   value: number;
 }
 
-export default function TermVis({
+export default function EnrichrTermVis({
   enrichedTerms,
-  sourceType,
-  setSourceType,
-  setTab,
   setFilterTerm
 }: {
-  enrichedTerms: EnrichedTermResult[] | undefined,
-  sourceType: string,
-  setSourceType: React.Dispatch<React.SetStateAction<string>>,
-  setTab: React.Dispatch<React.SetStateAction<number>>,
+  enrichedTerms: EnrichrResult[] | undefined,
   setFilterTerm: Function,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,7 +82,7 @@ export default function TermVis({
 
   const totalPages = useMemo(() => Math.ceil(enrichedTermsFiltered?.length || 1 / entriesPerPage), [enrichedTermsFiltered, entriesPerPage])
 
-
+  console.log(enrichedTerms)
   const barChartData = {
     labels: enrichedTermsFiltered?.slice(startIndex, endIndex).map((t) => t?.term) || [],
     datasets: [
@@ -123,28 +117,10 @@ export default function TermVis({
     {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
-        <p className="font-light mb-3">Functional term signfigance for the top 5,000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
+        <p className="font-light mb-3">Top 3 significant (adj. p-value &lt; 0.05) <a href="https://maayanlab.cloud/Enrichr/" target="_blank">Enrichr</a> terms precomputed for 
+        each signature appearing in top 500 signatures from selected libraries (ChEA_2022, KEGG_2021_Human, 
+        WikiPathway_2023_Human, MGI_Mammalian_Phenotype_Level_4_2021, GO_Biological_Process_2023, Human_Phenotype_Ontology, GWAS_Catalog_2023). Signfigance of term rankings is computed with the Kolmogorov–Smirnov test.</p>
         <div className="flex gap-3">
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'A'})}
-          onClick={() => {
-            setSourceType('A')
-            setCurrentPage(1)
-          }}>Disease/Phenotype</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'B'})}
-          onClick={() => {
-            setSourceType('B')
-            setCurrentPage(1)
-          }}>Biomolecules</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'C'})}
-          onClick={() => {
-            setSourceType('C')
-            setCurrentPage(1)
-            }}>Tissue/Cell</button>
-          <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'D'})}
-          onClick={() => {
-            setSourceType('D')
-            setCurrentPage(1)
-            }}>Pathway/Biological Process</button>
         </div>
         <button
           className="float-right m-3"
@@ -206,14 +182,10 @@ export default function TermVis({
                 onClick={(evt) => {
                   evt.preventDefault()
                   if (!enrichedTermsFiltered) return
-                  const blob = blobTsv(['term', 'CountInEnrichedGSEs', 'OtherTermsInEnrichedGSEs', 'TotalGSEsWithTerm', 'TotalOtherTerms', 'OddsRatio', 'Pvalue', 'AdjPvalue'], enrichedTermsFiltered, elt => {
+                  const blob = blobTsv(['term', 'CountInEnrichedGSEs', 'Pvalue', 'AdjPvalue'], enrichedTermsFiltered, elt => {
                   return {
                   term: elt.term,
                   CountInEnrichedGSEs: elt.count,
-                  OtherTermsInEnrichedGSEs: elt.notTermCount,
-                  TotalGSEsWithTerm: elt.totalTermCount,
-                  TotalOtherTerms: elt.totalNotTermCount,
-                  OddsRatio: elt.oddsRatio,
                   Pvalue: elt.pvalue,
                   AdjPvalue: elt.adjPvalue
                   }
@@ -231,13 +203,9 @@ export default function TermVis({
         <thead>
           <tr className="text-center">
             <th>Term</th>
-            <th>Count in Enriched GSEs</th>
-            <th>Other terms in Enriched GSEs</th>
-            <th>Total GSEs w/ term</th>
-            <th>Total other terms</th>
-            <th>Odds Ratio</th>
             <th>P-value</th>
             <th>Adj. P-value</th>
+            <th>Count in Enriched Signatures</th>
           </tr>
         </thead>
         <tbody>
@@ -247,7 +215,6 @@ export default function TermVis({
                 <td>
                   <a className="link" onClick={() => {
                     setFilterTerm({page: "1", q: row.term})
-                    setTab(1)
                   }
                   }>
                     <div className="tooltip tooltip-right underline" data-tip={`View enriched signatures which mention ${row.term}`}>
@@ -255,13 +222,10 @@ export default function TermVis({
                     </div>
                   </a>
                 </td>
-                <td>{row.count}</td>
-                <td>{row.notTermCount}</td>
-                <td>{row.totalTermCount}</td>
-                <td>{row.totalNotTermCount}</td>
-                <td>{row.oddsRatio?.toPrecision(3)}</td>
+                
                 <td>{row.pvalue?.toPrecision(3)}</td>
                 <td>{row.adjPvalue?.toPrecision(3)}</td>
+                <td>{row.count}</td>
               </tr>
             );
           })}
