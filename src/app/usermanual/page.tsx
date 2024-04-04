@@ -203,6 +203,81 @@ export default function UserManual() {
             alt={""}
             className="border rounded-lg mx-auto my-4"
           />
+
+          <p>
+          Selecting the "Common Terms in Matching Gene Sets" tab will provide enrichment results computed with the Fisher's Exact Test for the first 5,000 unique GSEs from signatures returned in the gene set search result:
+          </p>
+          <Image
+            src="/images/gene-set-search-7.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+           <p>
+          Additionally, below the bar chart, the user may view a table with all enriched terms including the signfigance of each term's appearance. Clicking a term will result in the user being brought back to the "Matching Gene Sets" tab wherein the user can view the gene sets that contain the selected term:
+          </p>
+          <Image
+            src="/images/gene-set-search-8.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+
+          <p>
+         Selecting the "Enrichr Terms" tab will show the most commonly appearing Enrichr terms in the top 500 signatures returned from the gene set search. Enrichr terms are precomputed for all RummaGEO signatures for a selection of libraries (ChEA 2022, KEGG 2021 Human, WikiPathway 2023 Human, GO Biological Process 2023, MGI Mammalian Phenotype Level 4 2021, Human Phenotype Ontology, and GWAS Catalog 2023):
+          </p>
+          <Image
+            src="/images/gene-set-search-9.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+          
+          
+          <h3
+            className="title text-lg font-medium mb-3 mt-10"
+            id="pubmed-search"
+          >
+            Hypothesis Generation
+          </h3>
+
+          <p>
+          Users may also generate hypotheses concerning their gene set's overlap with any RummaGEO signatures:
+          </p>
+          <Image
+            src="/images/gene-set-search-10.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+
+          <p>
+          After clicking the generate hypothesis button, users will need to enter a description of their gene set, which will be provided to the LLM:
+          </p>
+          <Image
+            src="/images/gene-set-search-11.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+          <p>
+          RummaGEO takes this description together with the matching RummaGEO gene set study abstract, and the top three significantly enriched terms from the overlapping genes from several Enrichr libraries (WikiPathway 2023 Human, GWAS Catalog 2023, GO Biological Process 2023, MGI Mammalian Phenotype Level 4 2021). The prompt additionally instructs the large language model (LLM) to reference all the provided descriptions and context of the gene sets, as well as the highly enriched terms from Enrichr. Hypotheses are then parsed to find references to any enriched terms, and insert the enrichment statistics as part of the hypothesis description:
+
+          </p>
+          <Image
+            src="/images/gene-set-search-12.png"
+            width={600}
+            height={500}
+            alt={""}
+            className="border rounded-lg mx-auto my-4"
+          />
+
+
           <h2
             className="title text-xl font-medium mb-3 mt-10"
             id="pubmed-search"
