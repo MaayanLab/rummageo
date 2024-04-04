@@ -53,6 +53,42 @@ export default function Download() {
             </div>
           </div>
         </a>
+        <a className="stats shadow" href="https://s3.dev.maayanlab.cloud/rummageo/random50k_co-occurrence_coding.f" download="human_random50k_co-occurrence_coding.f">
+          <div className="stat gap-2">
+            <div className="stat-title">human_random50k_co-occurrence_coding.f</div>
+            <div className="stat-value">human coding co-occurence</div>
+            <div className="stat-desc whitespace-normal">
+              <span className="whitespace-nowrap">1.13G</span>, <span className="whitespace-nowrap">Last Updated Thu Apr 4 2024</span>
+            </div>
+          </div>
+        </a>
+        <a className="stats shadow" href="https://s3.dev.maayanlab.cloud/rummageo/random50k_co-occurrence_noncoding.f" download="human_random50k_co-occurrence_noncoding.f">
+          <div className="stat gap-2">
+            <div className="stat-title">human_random50k_co-occurrence_noncoding.f</div>
+            <div className="stat-value">human noncoding co-occurence</div>
+            <div className="stat-desc whitespace-normal">
+              <span className="whitespace-nowrap">2.41G</span>, <span className="whitespace-nowrap">Last Updated Thu Apr 4 2024</span>
+            </div>
+          </div>
+        </a>
+        <a className="stats shadow" href="https://s3.dev.maayanlab.cloud/rummageo/mouse_random50k_co-occurrence_coding.f" download="mouse_random50k_co-occurrence_coding.f">
+          <div className="stat gap-2">
+            <div className="stat-title">mouse_random50k_co-occurrence_coding.f</div>
+            <div className="stat-value">mouse coding co-occurence</div>
+            <div className="stat-desc whitespace-normal">
+              <span className="whitespace-nowrap">1.16G</span>, <span className="whitespace-nowrap">Last Updated Thu Apr 4 2024</span>
+            </div>
+          </div>
+        </a>
+        <a className="stats shadow" href="https://s3.dev.maayanlab.cloud/rummageo/mouse_random50k_co-occurrence_noncoding.f" download="mouse_random50k_co-occurrence_noncoding.f">
+          <div className="stat gap-2">
+            <div className="stat-title">mouse_random50k_co-occurrence_noncoding.f</div>
+            <div className="stat-value">mouse noncoding co-occurence</div>
+            <div className="stat-desc whitespace-normal">
+              <span className="whitespace-nowrap">1.41G</span>, <span className="whitespace-nowrap">Last Updated Thu Apr 4 2024</span>
+            </div>
+          </div>
+        </a>
       </div>
       <p>
         Developed in <a className='underline cursor' href="https://labs.icahn.mssm.edu/maayanlab/">the Ma&apos;ayan Lab</a>
