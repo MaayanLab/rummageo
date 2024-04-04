@@ -133,23 +133,20 @@ CREATE TYPE app_public_v2.paginated_enrich_result AS (
 
 
 --
--- Name: enrich_functional_terms(character varying[], character varying, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
+-- Name: enrich_functional_terms(character varying[], character varying, character varying, character varying[], bigint, jsonb); Type: FUNCTION; Schema: app_private_v2; Owner: -
 --
 
-CREATE FUNCTION app_private_v2.enrich_functional_terms(terms_concat character varying[], source_type character varying, species character varying) RETURNS app_public_v2.enriched_term_result[]
-    LANGUAGE plpython3u IMMUTABLE
+CREATE FUNCTION app_private_v2.enrich_functional_terms(terms_concat character varying[], source_type character varying, species character varying, category_terms character varying[], total_count bigint, term_counts_json jsonb) RETURNS app_public_v2.enriched_term_result[]
+    LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
     AS $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
+    import json
     import math
 
     if terms_concat is None or not terms_concat:
       return []
-
-    category_terms = plpy.execute(f"SELECT term_name FROM app_public_v2.term_categories WHERE category = '{source_type}'")
-    category_terms = set(map(lambda t: t['term_name'], category_terms))
-    total_count = plpy.execute(f"SELECT term_total FROM app_public_v2.category_total_count WHERE category = '{source_type}'")[0]['term_total']
 
     concat_terms = list(filter(lambda t: t in category_terms, terms_concat))
 
@@ -157,13 +154,15 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(terms_concat character va
     term_counts = list(term_counter.items())
     total_enrich_term_count = sum(term_counter.values())
 
+    print(term_counts_json)
+    term_counts_dict = json.loads(term_counts_json)
+
     results = []
     p_values = []
     for term, count in term_counts:
       try:
         escaped_term = term.replace("'", "''")
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.terms_count_{species} WHERE terms = '{escaped_term}'")
-        total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
+        total_term_count = term_counts_dict.get(term, 0)
         a = count
         b = total_enrich_term_count - count
         c = total_term_count
@@ -268,7 +267,7 @@ $$;
 --
 
 CREATE FUNCTION app_private_v2.sig_enrichr_terms(concat_terms jsonb, species character varying) RETURNS app_public_v2.enrichr_result[]
-    LANGUAGE plpython3u IMMUTABLE
+    LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
     AS $$
     from scipy.stats import kstest
     from statsmodels.stats.multitest import multipletests
@@ -451,10 +450,10 @@ with enriched_sigs_with_row_number as (
     select enriched_sigs[i] as sig, i as rn
     from generate_subscripts(enriched_sigs, 1) as i
 ), enrichr_attrs AS (
-    SELECT jsonb_object_agg(es.rn::text, sig_terms) AS attrs
-    FROM app_public_v2.enrichr_terms et
-    JOIN enriched_sigs_with_row_number es ON REPLACE(et.sig, '.tsv', '') = es.sig and et.organism = organism
-    WHERE cardinality(sig_terms) > 0
+    select jsonb_object_agg(es.rn::text, sig_terms) as attrs
+    from app_public_v2.enrichr_terms et
+    join enriched_sigs_with_row_number es ON et.sig = es.sig and et.organism = organism
+    where cardinality(sig_terms) > 0
 )
 -- Call the enrich_functional_terms function and order by row number
 select * from app_private_v2.sig_enrichr_terms((SELECT attrs FROM enrichr_attrs), organism)
@@ -465,7 +464,7 @@ $$;
 -- Name: enriched_functional_terms(character varying[], character varying, character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
-CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character varying[], source_type character varying, organism character varying) RETURNS app_public_v2.enriched_term_result[]
+CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character varying[], source_type character varying, spec character varying) RETURNS app_public_v2.enriched_term_result[]
     LANGUAGE sql IMMUTABLE SECURITY DEFINER
     AS $$
   with gse_ids as (
@@ -478,13 +477,19 @@ CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character
     from (
       select unnest(llm_attrs) as terms
       from app_public_v2.gse_terms
-      where gse in (select id from gse_ids) and species = organism
+      where gse in (select id from gse_ids) and species = spec
     ) subquery
     )
     -- Call the enrich_functional_terms function
     select * from app_private_v2.enrich_functional_terms(
       (select terms from gse_terms),
-      source_type, organism)
+      source_type, spec,
+      (SELECT array_agg(term_name )FROM app_public_v2.term_categories WHERE category = source_type),
+      (SELECT term_total FROM app_public_v2.category_total_count WHERE category = source_type),
+      (SELECT COALESCE(jsonb_object_agg(terms, term_count), '{}'::jsonb)
+      FROM app_public_v2.terms_count_combined
+      WHERE terms IN (SELECT unnest(terms) FROM gse_terms) AND organism = spec)
+      );
 $$;
 
 
@@ -919,29 +924,24 @@ COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2
 
 
 --
--- Name: terms_count_human; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+-- Name: terms_count_combined; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
-CREATE MATERIALIZED VIEW app_public_v2.terms_count_human AS
+CREATE MATERIALIZED VIEW app_public_v2.terms_count_combined AS
  SELECT subquery.terms,
-    count(subquery.terms) AS term_count
-   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
-           FROM app_public_v2.gse_terms
-          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
-  GROUP BY subquery.terms
-  WITH NO DATA;
-
-
---
--- Name: terms_count_mouse; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
---
-
-CREATE MATERIALIZED VIEW app_public_v2.terms_count_mouse AS
- SELECT subquery.terms,
-    count(subquery.terms) AS term_count
+    count(subquery.terms) AS term_count,
+    'mouse'::text AS organism
    FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
            FROM app_public_v2.gse_terms
           WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
+  GROUP BY subquery.terms
+UNION ALL
+ SELECT subquery.terms,
+    count(subquery.terms) AS term_count,
+    'human'::text AS organism
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
   GROUP BY subquery.terms
   WITH NO DATA;
 

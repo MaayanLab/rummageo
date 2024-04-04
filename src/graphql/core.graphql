@@ -70,7 +70,7 @@ query EnrichmentQuery($genes: [String]!, $filterTerm: String = "", $offset: Int 
 
 # Perform term enrichment analysis against a specific set of terms ("llm_attrs", "mesh_attrs", "pubmed_attrs")
 query TermEnrichment($enrichedTerms: [String], $sourceType: String = "llm_attrs", $species: String = "human") {
-  enrichedFunctionalTerms(enrichedTerms: $enrichedTerms, sourceType: $sourceType organism: $species) {
+  enrichedFunctionalTerms(enrichedTerms: $enrichedTerms, sourceType: $sourceType, spec: $species) {
     adjPvalue
     count
     oddsRatio

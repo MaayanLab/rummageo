@@ -160,7 +160,7 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
         }
 
         // compute the index in memory
-        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title, gp.silhouette_score, gp.gse_attrs, et.sig_terms from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id left join app_public_v2.enrichr_terms et on gp.term = replace(et.sig, '.tsv', '') where gs.species = '{}';", species).as_str())
+        sqlx::query(format!("select gs.id, gs.term, gs.gene_ids, gp.title, gp.silhouette_score, gp.gse_attrs, et.sig_terms from app_public_v2.gene_set gs join app_public_v2.gene_set_pmid gp on gs.id = gp.id left join app_public_v2.enrichr_terms et on gp.term = et.sig where gs.species = '{}';", species).as_str())
             .fetch(&mut **db)
             .for_each(|row| {
                 let row = row.unwrap();
@@ -168,8 +168,8 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
                 let attrs: String = row.try_get("gse_attrs").unwrap();
-                let sig_terms: Vec<String> = row.try_get("sig_terms").unwrap();
-                let sig_terms_str = sig_terms.join(" ");
+                let sig_terms: Option<Vec<String>> = row.try_get("sig_terms").unwrap_or_default();
+                let sig_terms_str = sig_terms.map(|terms| terms.join(" ")).unwrap_or_else(|| String::new());
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
