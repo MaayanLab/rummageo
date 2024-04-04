@@ -178,6 +178,28 @@ def import_gse_attrs(plpy, species='human'):
       mesh_attrs = gse_attrs[gse]['MeSH']
       plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs, species))
 
+  #plpy.execute('refresh materialized view app_public_v2.terms_count_combined', [])
+
+  plpy.execute("""alter table app_public_v2.gse_info drop column gse_attrs cascade;
+                  alter table app_public_v2.gse_info add column gse_attrs varchar;
+                  UPDATE app_public_v2.gse_info gi
+                  SET    gse_attrs = array_to_string(
+                          ARRAY(
+                            SELECT val
+                            FROM   unnest(gt.llm_attrs) AS val
+                            WHERE  val IS NOT NULL
+                            UNION ALL
+                            SELECT val
+                            FROM   unnest(gt.mesh_attrs) AS val
+                            WHERE  val IS NOT NULL
+                            UNION ALL
+                            SELECT val
+                            FROM   unnest(gt.pubmed_attrs) AS val
+                            WHERE  val IS NOT NULL
+                          ), ' ')
+                  FROM   app_public_v2.gse_terms gt
+                  WHERE  gi.gse = gt.gse and gi.species = gt.species;""", [])
+
 
 def import_term_categories(plpy):
   import pandas as pd
@@ -500,6 +522,33 @@ def ingest_gse_info(species):
   from plpy import plpy
   try:
     import_gse_info(plpy, species)
+  except:
+    plpy.conn.rollback()
+    raise
+  else:
+    plpy.conn.commit()
+
+@cli.command()
+def fix_mouse_terms():
+  from plpy import plpy
+  try:
+    from tqdm import tqdm
+    terms = [
+    (r['id'], r['term'])
+      for r in plpy.cursor(
+        f'''
+          SELECT id, term FROM app_public_v2.gene_set WHERE species = 'mouse';
+        '''
+      )
+    ]
+
+    # Update each term
+    for term in tqdm(terms):
+        # Remove the '.tsv' extension from the term
+        id = term[0]
+        new_term = term[1].replace('.tsv', '')
+        # Execute the UPDATE query
+        plpy.execute("UPDATE app_public_v2.gene_set SET term = %s WHERE id = %s;", (new_term, id))
   except:
     plpy.conn.rollback()
     raise

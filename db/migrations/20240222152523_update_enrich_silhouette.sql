@@ -24,38 +24,34 @@ select category, count(term_name) as term_total
 from app_public_v2.term_categories
 group by category;
 
-create materialized view app_public_v2.terms_count_mouse as
-select terms, COUNT(terms) as term_count
+create materialized view app_public_v2.terms_count_combined as
+select terms, COUNT(terms) AS term_count, 'mouse' AS organism
 from (
-  select unnest(llm_attrs) as terms
+  select unnest(llm_attrs) AS terms
   from app_public_v2.gse_terms
   where species = 'mouse'
 ) subquery
-group by terms;
-
-create materialized view app_public_v2.terms_count_human as
-select terms, COUNT(terms) as term_count
+group by terms
+union all
+select terms, COUNT(terms) AS term_count, 'human' AS organism
 from (
-  select unnest(llm_attrs) as terms
+  select unnest(llm_attrs) AS terms
   from app_public_v2.gse_terms
   where species = 'human'
 ) subquery
 group by terms;
 
 
-create or replace function app_private_v2.enrich_functional_terms(
-    terms_concat varchar[], source_type varchar, species varchar) returns app_public_v2.enriched_term_result[] as $$
+create function app_private_v2.enrich_functional_terms(
+    terms_concat varchar[], source_type varchar, species varchar, category_terms varchar[], total_count bigint, term_counts_json jsonb) returns app_public_v2.enriched_term_result[] as $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
     from collections import Counter
+    import json
     import math
 
     if terms_concat is None or not terms_concat:
       return []
-
-    category_terms = plpy.execute(f"SELECT term_name FROM app_public_v2.term_categories WHERE category = '{source_type}'")
-    category_terms = set(map(lambda t: t['term_name'], category_terms))
-    total_count = plpy.execute(f"SELECT term_total FROM app_public_v2.category_total_count WHERE category = '{source_type}'")[0]['term_total']
 
     concat_terms = list(filter(lambda t: t in category_terms, terms_concat))
 
@@ -63,13 +59,15 @@ create or replace function app_private_v2.enrich_functional_terms(
     term_counts = list(term_counter.items())
     total_enrich_term_count = sum(term_counter.values())
 
+    print(term_counts_json)
+    term_counts_dict = json.loads(term_counts_json)
+
     results = []
     p_values = []
     for term, count in term_counts:
       try:
         escaped_term = term.replace("'", "''")
-        term_count_result = plpy.execute(f"SELECT term_count FROM app_public_v2.terms_count_{species} WHERE terms = '{escaped_term}'")
-        total_term_count = term_count_result[0]['term_count'] if term_count_result else 0
+        total_term_count = term_counts_dict.get(term, 0)
         a = count
         b = total_enrich_term_count - count
         c = total_term_count
@@ -105,11 +103,11 @@ create or replace function app_private_v2.enrich_functional_terms(
     else:
         results = list(sorted(results, key=lambda r: r['pvalue']))[:100]
     return results
-$$ language plpython3u immutable parallel unsafe;
+$$ language plpython3u immutable parallel safe;
 
 
 create or replace function app_public_v2.enriched_functional_terms(
-  enriched_terms varchar[], source_type varchar, organism varchar) returns app_public_v2.enriched_term_result[] as $$ 
+  enriched_terms varchar[], source_type varchar, spec varchar) returns app_public_v2.enriched_term_result[] as $$ 
   with gse_ids as (
     -- Split enriched_terms vector to get GSE ids
     select regexp_replace(t, '\mGSE([^-]+)\M.*', 'GSE\1') as id
@@ -120,13 +118,19 @@ create or replace function app_public_v2.enriched_functional_terms(
     from (
       select unnest(llm_attrs) as terms
       from app_public_v2.gse_terms
-      where gse in (select id from gse_ids) and species = organism
+      where gse in (select id from gse_ids) and species = spec
     ) subquery
     )
     -- Call the enrich_functional_terms function
     select * from app_private_v2.enrich_functional_terms(
       (select terms from gse_terms), 
-      source_type, organism)
+      source_type, spec, 
+      (SELECT array_agg(term_name )FROM app_public_v2.term_categories WHERE category = source_type),
+      (SELECT term_total FROM app_public_v2.category_total_count WHERE category = source_type),
+      (SELECT COALESCE(jsonb_object_agg(terms, term_count), '{}'::jsonb) 
+      FROM app_public_v2.terms_count_combined 
+      WHERE terms IN (SELECT unnest(terms) FROM gse_terms) AND organism = spec)
+      );
 $$ language sql immutable parallel unsafe security definer;
 grant execute on function app_public_v2.enriched_functional_terms to guest, authenticated;
 
@@ -267,13 +271,13 @@ as $$
 $$ language sql immutable strict parallel safe;
 grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
 
-create table app_public_v2.enrichr_terms (
+/* create table app_public_v2.enrichr_terms (
   sig varchar not null,
   organism varchar not null,
   sig_terms varchar[],
   enrichr_stats jsonb,
   unique(sig, organism)
-);
+); */
 
 -- migrate:down
 drop function app_public_v2.background_enrich;
@@ -281,6 +285,5 @@ drop function app_private_v2.indexed_enrich;
 drop type app_public_v2.enriched_term_result cascade;
 
 drop materialized view app_public_v2.category_total_count;
-drop materialized view app_public_v2.terms_count_human;
-drop materialized view app_public_v2.terms_count_mouse;
+drop materialized view app_public_v2.terms_count_combined;
 

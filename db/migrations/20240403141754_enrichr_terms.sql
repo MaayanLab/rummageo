@@ -9,9 +9,6 @@ create type app_public_v2.enrichr_result as (
 );
 
 
-/* UPDATE app_public_v2.gene_set */
-/* SET term = replace(term, '.tsv', ''); */
-
 grant select on app_public_v2.enrichr_terms to guest;
 grant all privileges on app_public_v2.enrichr_terms to authenticated;
 
