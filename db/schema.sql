@@ -485,7 +485,7 @@ CREATE FUNCTION app_public_v2.enriched_functional_terms(enriched_terms character
       (select terms from gse_terms),
       source_type, spec,
       (SELECT array_agg(term_name )FROM app_public_v2.term_categories WHERE category = source_type),
-      (SELECT term_total FROM app_public_v2.category_total_count WHERE category = source_type),
+      (SELECT term_total::bigint FROM app_public_v2.category_total_count WHERE category = source_type),
       (SELECT COALESCE(jsonb_object_agg(terms, term_count), '{}'::jsonb)
       FROM app_public_v2.terms_count_combined
       WHERE terms IN (SELECT unnest(terms) FROM gse_terms) AND organism = spec)
@@ -808,6 +808,19 @@ $$;
 
 
 --
+-- Name: gse_terms; Type: TABLE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TABLE app_public_v2.gse_terms (
+    gse character varying NOT NULL,
+    species character varying NOT NULL,
+    llm_attrs character varying[],
+    pubmed_attrs character varying[],
+    mesh_attrs character varying[]
+);
+
+
+--
 -- Name: term_categories; Type: TABLE; Schema: app_public_v2; Owner: -
 --
 
@@ -818,14 +831,38 @@ CREATE TABLE app_public_v2.term_categories (
 
 
 --
+-- Name: terms_count_combined; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.terms_count_combined AS
+ SELECT subquery.terms,
+    count(subquery.terms) AS term_count,
+    'mouse'::text AS organism
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
+  GROUP BY subquery.terms
+UNION ALL
+ SELECT subquery.terms,
+    count(subquery.terms) AS term_count,
+    'human'::text AS organism
+   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
+           FROM app_public_v2.gse_terms
+          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
+  GROUP BY subquery.terms
+  WITH NO DATA;
+
+
+--
 -- Name: category_total_count; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
 --
 
 CREATE MATERIALIZED VIEW app_public_v2.category_total_count AS
- SELECT term_categories.category,
-    count(term_categories.term_name) AS term_total
-   FROM app_public_v2.term_categories
-  GROUP BY term_categories.category
+ SELECT tc.category,
+    sum(tcc.term_count) AS term_total
+   FROM (app_public_v2.term_categories tc
+     JOIN app_public_v2.terms_count_combined tcc ON (((tc.term_name)::text = (tcc.terms)::text)))
+  GROUP BY tc.category
   WITH NO DATA;
 
 
@@ -895,19 +932,6 @@ COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2
 
 
 --
--- Name: gse_terms; Type: TABLE; Schema: app_public_v2; Owner: -
---
-
-CREATE TABLE app_public_v2.gse_terms (
-    gse character varying NOT NULL,
-    species character varying NOT NULL,
-    llm_attrs character varying[],
-    pubmed_attrs character varying[],
-    mesh_attrs character varying[]
-);
-
-
---
 -- Name: pmc; Type: VIEW; Schema: app_public_v2; Owner: -
 --
 
@@ -921,29 +945,6 @@ CREATE VIEW app_public_v2.pmc AS
 --
 
 COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2.gene_set_pmc (pmc)';
-
-
---
--- Name: terms_count_combined; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
---
-
-CREATE MATERIALIZED VIEW app_public_v2.terms_count_combined AS
- SELECT subquery.terms,
-    count(subquery.terms) AS term_count,
-    'mouse'::text AS organism
-   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
-           FROM app_public_v2.gse_terms
-          WHERE ((gse_terms.species)::text = 'mouse'::text)) subquery
-  GROUP BY subquery.terms
-UNION ALL
- SELECT subquery.terms,
-    count(subquery.terms) AS term_count,
-    'human'::text AS organism
-   FROM ( SELECT unnest(gse_terms.llm_attrs) AS terms
-           FROM app_public_v2.gse_terms
-          WHERE ((gse_terms.species)::text = 'human'::text)) subquery
-  GROUP BY subquery.terms
-  WITH NO DATA;
 
 
 --

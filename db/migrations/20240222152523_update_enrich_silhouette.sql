@@ -19,11 +19,6 @@ create type app_public_v2.paginated_enrich_result as (
   enriched_terms varchar[]
 );
 
-create materialized view app_public_v2.category_total_count as
-select category, count(term_name) as term_total
-from app_public_v2.term_categories
-group by category;
-
 create materialized view app_public_v2.terms_count_combined as
 select terms, COUNT(terms) AS term_count, 'mouse' AS organism
 from (
@@ -40,6 +35,12 @@ from (
   where species = 'human'
 ) subquery
 group by terms;
+
+CREATE MATERIALIZED VIEW app_public_v2.category_total_count AS
+SELECT tc.category, SUM(tcc.term_count) AS term_total
+FROM app_public_v2.term_categories tc
+JOIN app_public_v2.terms_count_combined tcc ON tc.term_name = tcc.terms
+GROUP BY tc.category;
 
 
 create function app_private_v2.enrich_functional_terms(
@@ -126,7 +127,7 @@ create or replace function app_public_v2.enriched_functional_terms(
       (select terms from gse_terms), 
       source_type, spec, 
       (SELECT array_agg(term_name )FROM app_public_v2.term_categories WHERE category = source_type),
-      (SELECT term_total FROM app_public_v2.category_total_count WHERE category = source_type),
+      (SELECT term_total::bigint FROM app_public_v2.category_total_count WHERE category = source_type),
       (SELECT COALESCE(jsonb_object_agg(terms, term_count), '{}'::jsonb) 
       FROM app_public_v2.terms_count_combined 
       WHERE terms IN (SELECT unnest(terms) FROM gse_terms) AND organism = spec)
