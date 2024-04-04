@@ -20,7 +20,6 @@ export default function HypothesisModal({
   setShowModal: (show: boolean) => void;
 }) {
   const [hypothesis, setHypothesis] = React.useState<Record<string, string> | null>(null);
-  const [enrichrTerms, setEnrichrTerms] = React.useState<Record<string, string[]> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<boolean>(false);
   const [geneSetDesc, setGeneSetDesc] = React.useState<string>("");
@@ -32,7 +31,7 @@ export default function HypothesisModal({
 
   const { data } = useQueryGseSummaryQuery({
     variables: {
-      id: gseId,
+      id: gseId || '',
     },
   });
 
@@ -56,7 +55,6 @@ export default function HypothesisModal({
             setError('Error fetching enrichment results');
             return;
           } else {
-        console.log(enrich)
         const hypothesisRes = await fetchHypothesis(
             geneSetDesc,
             data?.gseInfo?.summary || "",
@@ -64,10 +62,8 @@ export default function HypothesisModal({
             enrich[0] as Record<string, string[]>,
             enrich[1] as Record<string, string[]>
           );
-          console.log(hypothesisRes)
           const newHypothesis = {...hypothesis}
           if (hypothesisRes != undefined) newHypothesis[t || ''] = hypothesisRes
-          console.log(Object.keys(newHypothesis))
           setHypothesis(newHypothesis);
           setLoading(false);
         }
@@ -93,7 +89,6 @@ export default function HypothesisModal({
           e.clientY <= rect.top + rect.height &&
           rect.left <= e.clientX &&
           e.clientX <= rect.left + rect.width;
-        console.log(clickedInDialog);
         if (!clickedInDialog) setShowModal(false);
       }}
     >

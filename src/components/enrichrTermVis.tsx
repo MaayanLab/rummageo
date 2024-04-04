@@ -84,7 +84,6 @@ export default function EnrichrTermVis({
 
   const totalPages = useMemo(() => Math.ceil(enrichedTermsFiltered?.length || 1 / entriesPerPage), [enrichedTermsFiltered, entriesPerPage])
 
-  console.log(enrichedTerms)
   const barChartData = {
     labels: enrichedTermsFiltered?.slice(startIndex, endIndex).map((t) => t?.term) || [],
     datasets: [

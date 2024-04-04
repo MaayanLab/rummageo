@@ -43,15 +43,12 @@ export default async function fetchHypothesis(userDesc: string, gseSummary: stri
         }),
     })
 
-    console.log(tagLine)
 
     const tagLineJson = await tagLine.json()
 
     var hypothesis: string = tagLineJson.choices[0].message.content
     Object.keys(enrichedStats).forEach((word, index) =>{
         if (hypothesis.includes(word)) {
-            console.log('replacing', word)
-            console.log(enrichedStats[word])
             hypothesis = hypothesis.replaceAll(word, `<div className="tooltip underline italic flex-wrap inline z-50" 
             data-html="true" data-tip="Library: ${enrichedStats[word][9]}&#013;&#010;
             Rank: ${enrichedStats[word][0]}&#013;&#010;

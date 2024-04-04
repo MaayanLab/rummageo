@@ -153,8 +153,6 @@ CREATE FUNCTION app_private_v2.enrich_functional_terms(terms_concat character va
     term_counter = Counter(concat_terms)
     term_counts = list(term_counter.items())
     total_enrich_term_count = sum(term_counter.values())
-
-    print(term_counts_json)
     term_counts_dict = json.loads(term_counts_json)
 
     results = []

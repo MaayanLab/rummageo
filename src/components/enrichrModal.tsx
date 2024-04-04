@@ -32,7 +32,6 @@ export default function EnrichrModal({
       const rows: any[] = []
       Object.keys(enrichrStats).map((lib, i) => (
         enrichrStats[lib].map((row: any, j: any) => {
-          console.log(Number(row[2]))
           if ( Number(row[2]) < 0.05) {
             rows.push({
               term: row[0],
@@ -65,7 +64,6 @@ export default function EnrichrModal({
           e.clientY <= rect.top + rect.height &&
           rect.left <= e.clientX &&
           e.clientX <= rect.left + rect.width;
-        console.log(clickedInDialog);
         if (!clickedInDialog) setShowModal(false);
       }}
     >

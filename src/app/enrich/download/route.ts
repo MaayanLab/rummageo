@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const species = determineSpecies(genes[0] || '')
 
   const backgroundId = backgroundIds[species] ?? null
-  console.log('backgroundId', backgroundId)
+
   const { data: enrichmentResults, error: enrichmentResultsError } = await getClient().query<EnrichmentQueryQuery>({
     query: EnrichmentQueryDocument,
     variables: {
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   })
 
   if (enrichmentResultsError) throw new Error(enrichmentResultsError.message)
-  console.log('enrichmentResults', enrichmentResults)
+
   const nodes = enrichmentResults.background?.enrich?.nodes
   if (!nodes) throw new Error('No results')
 

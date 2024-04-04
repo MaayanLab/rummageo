@@ -59,8 +59,6 @@ create function app_private_v2.enrich_functional_terms(
     term_counter = Counter(concat_terms)
     term_counts = list(term_counter.items())
     total_enrich_term_count = sum(term_counter.values())
-
-    print(term_counts_json)
     term_counts_dict = json.loads(term_counts_json)
 
     results = []
@@ -163,7 +161,6 @@ create or replace function app_private_v2.indexed_enrich(
     params=params,
     json=gene_ids,
   )
-  print(filter_score_le)
   total_count = req.headers.get('Content-Range').partition('/')[-1]
   req_json = req.json()
   enriched_terms = req_json.pop('terms')

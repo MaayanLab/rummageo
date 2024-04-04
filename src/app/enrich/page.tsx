@@ -420,7 +420,6 @@ function EnrichmentResults({
                       const cond2Samples =
                         node?.sampleGroups?.samples[cond2] ?? "";
 
-                      if (!cond2Title) console.log(node, cond1, cond2);
                       return (
                         <tr key={j} className="text-center">
                           <th>
@@ -660,7 +659,6 @@ function EnrichmentResults({
                               <button
                                 className="btn btn-sm"
                                 onClick={(evt) => {
-                                  console.log(term)
                                   setModalEnrichr({
                                     type: "GeneSet",
                                     id: enrichmentResult?.geneSet?.id,
@@ -789,7 +787,6 @@ function EnrichrModalWrapper(props: {
           }
         : undefined,
   });
-  console.log(props.modalGeneSet?.description)
   return (
     <EnrichrModal
       term={props.modalGeneSet?.description}
