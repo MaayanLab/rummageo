@@ -655,7 +655,7 @@ function EnrichmentResults({
                           <td>
                             <div
                               className="tooltip tooltip-left"
-                              data-tip="Generate GPT-4 Hypothesis"
+                              data-tip="View Enrichr Terms"
                             >
                               <button
                                 className="btn btn-sm"
@@ -668,10 +668,12 @@ function EnrichmentResults({
                                   });
                                 }}
                               >
-                                <img
+                                <Image
                                   src="/images/enrichr-icon.png"
                                   alt="Enrichr"
-                                  className="h-6 w-6"/>
+                                  width={20}
+                                  height={20}
+                                  className=""/>
                               </button>
                             </div>
                           </td>

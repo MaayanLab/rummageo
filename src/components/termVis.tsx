@@ -315,7 +315,7 @@ export default function TermVis({
       </div>
     </div> : <>
     <Loading />
-    <p className="text-center font-light">Calculating Fisher's Exact Test for Terms in Enriched GSEs...</p>
+    <p className="text-center font-light">Calculating Fisher&apos;s Exact Test for Terms in Enriched GSEs...</p>
     </>}
     </>
   );

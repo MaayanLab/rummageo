@@ -78,7 +78,7 @@ export default function HypothesisModal({
       setLoading(false);
       return;
     }
-  }, [geneSetDesc, wordCount]);
+  }, [geneSetDesc, wordCount, data?.gseInfo?.summary, geneset, hypothesis]);
 
   return (
     <div
@@ -127,7 +127,7 @@ export default function HypothesisModal({
                       className="btn btn-sm btn-outline text-xs p-2 m-2"
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(hypothesis[term || '']);
+                        navigator.clipboard.writeText(hypothesis[term || ''].replace(/<[^>]+>/g, ''));
                       }}
                     >
                       Copy to Clipboard
