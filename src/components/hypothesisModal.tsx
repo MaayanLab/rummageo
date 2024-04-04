@@ -28,10 +28,10 @@ export default function HypothesisModal({
     () => geneSetDesc.split(/\s+/).filter((word) => word.length > 0).length,
     [geneSetDesc]
   );
-
+  console.log(gseId)
   const { data } = useQueryGseSummaryQuery({
     variables: {
-      id: gseId || '',
+      id: gseId || '72b6589a-2d69-4a9c-b590-0f5fd651fa19',
     },
   });
 

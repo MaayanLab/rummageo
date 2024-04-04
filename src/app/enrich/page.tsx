@@ -328,10 +328,10 @@ function EnrichmentResults({
               data-tip="
             Submit a description of your gene set to generate a hypothesis utlizing the signature's associated study 
             abstract or summary and highly enriched terms from Enrichr libraries: WikiPathway 2023 Human GWAS_Catalog 2023, 
-            GO Biological Process 2023, and MGI Mammalian Phenotype Level 4 2021. Click to view use cases and examples in the documentation."
+            GO Biological Process 2023, and MGI Mammalian Phenotype Level 4 2021. "
             >
-              <div className="btn bg-transparent text-xs h-fit p-2">
-                <p className="mt-1">Hypothesis Generation</p> <FaInfo />
+              <div className="bg-transparent text-xs h-fit p-2 flex text-center border rounded-lg mx-auto">
+                <p className="font-light">Hypothesis Generation</p> <FaInfo className="ml-1 mt-0.5"/>
               </div>
             </div>
           </div>
