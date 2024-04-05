@@ -205,7 +205,7 @@ export default function UserManual() {
           />
 
           <p>
-          Selecting the "Common Terms in Matching Gene Sets" tab will provide enrichment results computed with the Fisher's Exact Test for the first 5,000 unique GSEs from signatures returned in the gene set search result:
+          Selecting the Common Terms in Matching Gene Sets tab will provide enrichment results computed with the Fisher&apos;s Exact Test for the first 5,000 unique GSEs from signatures returned in the gene set search result:
           </p>
           <Image
             src="/images/gene-set-search-7.png"
@@ -215,7 +215,7 @@ export default function UserManual() {
             className="border rounded-lg mx-auto my-4"
           />
            <p>
-          Additionally, below the bar chart, the user may view a table with all enriched terms including the signfigance of each term's appearance. Clicking a term will result in the user being brought back to the "Matching Gene Sets" tab wherein the user can view the gene sets that contain the selected term:
+          Additionally, below the bar chart, the user may view a table with all enriched terms including the signfigance of each term&apos;s appearance. Clicking a term will result in the user being brought back to the Matching Gene Sets tab wherein the user can view the gene sets that contain the selected term:
           </p>
           <Image
             src="/images/gene-set-search-8.png"
@@ -226,7 +226,7 @@ export default function UserManual() {
           />
 
           <p>
-         Selecting the "Enrichr Terms" tab will show the most commonly appearing Enrichr terms in the top 500 signatures returned from the gene set search. Enrichr terms are precomputed for all RummaGEO signatures for a selection of libraries (ChEA 2022, KEGG 2021 Human, WikiPathway 2023 Human, GO Biological Process 2023, MGI Mammalian Phenotype Level 4 2021, Human Phenotype Ontology, and GWAS Catalog 2023):
+         Selecting the Enrichr Terms tab will show the most commonly appearing Enrichr terms in the top 500 signatures returned from the gene set search. Enrichr terms are precomputed for all RummaGEO signatures for a selection of libraries (ChEA 2022, KEGG 2021 Human, WikiPathway 2023 Human, GO Biological Process 2023, MGI Mammalian Phenotype Level 4 2021, Human Phenotype Ontology, and GWAS Catalog 2023):
           </p>
           <Image
             src="/images/gene-set-search-9.png"
@@ -245,7 +245,7 @@ export default function UserManual() {
           </h3>
 
           <p>
-          Users may also generate hypotheses concerning their gene set's overlap with any RummaGEO signatures:
+          Users may also generate hypotheses concerning their gene set&apos;s overlap with any RummaGEO signatures:
           </p>
           <Image
             src="/images/gene-set-search-10.png"
