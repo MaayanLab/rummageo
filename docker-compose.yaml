@@ -10,6 +10,7 @@ services:
       - NODE_ENV=production
       - ENRICH_URL=http://localhost:8000
       - NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
+      - OPENAI_API_KEY=$OPENAI_API_KEY
     ports:
       - 3000:3000
   rummageo-enrich:
