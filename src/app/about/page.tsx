@@ -38,7 +38,7 @@ export default function About() {
             many future studies.
           </p>
           <h2 className="title text-xl font-medium mb-3 mt-3">Methods</h2>
-          <p>
+          <p className="text-justify">
             We considered any GEO study aligned by{" "}
             <Link
               href="https://maayanlab.cloud/archs4/"
