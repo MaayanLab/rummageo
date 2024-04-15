@@ -1,6 +1,6 @@
 {
   "name": "rummageo",
-  "version": "0.0.71",
+  "version": "0.0.8",
   "private": true,
   "scripts": {
     "dev": "concurrently \"next dev\" \"npm run generate -- --watch ./src/graphql/**/*.graphql\"",
