@@ -78,11 +78,8 @@ export default function About() {
           </p>
           <br></br>
           <p>
-            For for information about using RummaGEO, please refer to the {" "}
-            <Link
-              href="/usermanual"
-              className="underline cursor-pointer"
-            >
+            For for information about using RummaGEO, please refer to the{" "}
+            <Link href="/usermanual" className="underline cursor-pointer">
               User Manual
             </Link>
             .
@@ -113,7 +110,7 @@ export default function About() {
           </p>
           <br />
           <p>
-            ReummaGEO is actively being developed by{" "}
+            RummaGEO is actively being developed by{" "}
             <Link
               className="underline cursor"
               href="https://labs.icahn.mssm.edu/maayanlab/"
@@ -121,6 +118,22 @@ export default function About() {
             >
               the Ma&apos;ayan Lab
             </Link>
+          </p>
+          <br />
+          <p>
+            Please acknowledge RummaGEO in your publications by citing the
+            following reference:
+          </p>
+          <p>
+            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi Ma'ayan.
+            RummaGEO: Automatic Mining of Human and Mouse Gene Sets from GEO. 
+          </p>
+          <p>
+            <Link
+              className="underline cursor"
+              href={"https://doi.org/10.1101/2024.04.09.588712"}
+              target="_blank"
+            >bioRxiv 2024.04.09.588712</Link>
           </p>
         </div>
       </div>
