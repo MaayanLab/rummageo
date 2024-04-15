@@ -270,7 +270,12 @@ function EnrichmentResults({
             <div className="tooltip" data-tip="Filter results">
               <button
                 className="btn bg-transparent"
-                onClick={() => setFilterScore(filterScoreSilder)}
+                onClick={() => {
+                  setQueryString({ page: "1", q: "" })
+                  setFilterScore(filterScoreSilder)
+                }
+                  
+                }
               >
                 <FaFilter />
               </button>
