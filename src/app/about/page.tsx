@@ -125,7 +125,7 @@ export default function About() {
             following reference:
           </p>
           <p>
-            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi Ma'ayan.
+            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi Ma&apos;ayan.
             RummaGEO: Automatic Mining of Human and Mouse Gene Sets from GEO. 
           </p>
           <p>
