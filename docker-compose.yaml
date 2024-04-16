@@ -1,4 +1,9 @@
 version: '3.9'
+
+x-kubernetes:
+  name: rummageo
+  namespace: rummageo
+
 services:
   rummageo-app:
     platform: linux/amd64
@@ -8,11 +13,16 @@ services:
       - DATABASE_URL=$DATABASE_URL
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
       - NODE_ENV=production
-      - ENRICH_URL=http://localhost:8000
+      - ENRICH_URL=http://rummageo-enrich:8000
       - NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
       - OPENAI_API_KEY=$OPENAI_API_KEY
     ports:
       - 3000:3000
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+      annotations:
+        maayanlab.cloud/ingress: https://rummageo.com
+
   rummageo-enrich:
     platform: linux/amd64
     build: enrich
@@ -21,6 +31,9 @@ services:
       - 'ROCKET_DATABASES={postgres={url="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@rummageo-postgres/${POSTGRES_DB}"}}'
     ports:
       - 8000:8000
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+
   rummageo-postgres:
     platform: linux/amd64
     build: db
@@ -32,4 +45,13 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - ./data/postgres/:/var/lib/postgresql/data
+      - rummageo-data:/var/lib/postgresql/data
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+
+volumes:
+  rummageo-data:
+    x-kubernetes:
+      size: 20Gi
+      class: gp2
+
