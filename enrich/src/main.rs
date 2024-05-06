@@ -5,6 +5,7 @@ mod bitvec;
 #[macro_use] extern crate rocket;
 use async_lock::RwLock;
 use futures::StreamExt;
+use num::Integer;
 use rocket::http::ContentType;
 use std::future;
 use std::io::Cursor;
@@ -36,14 +37,14 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[database("postgres")]
 struct Postgres(sqlx::PgPool);
 
-struct Bitmap {
-    columns: HashMap<Uuid, u32>,
+struct Bitmap<B: Integer + Copy + Into<usize>> {
+    columns: HashMap<Uuid, B>,
     columns_str: Vec<String>,
-    values: Vec<(Uuid, String, String, String, String, f64, SparseBitVec)>,
+    values: Vec<(Uuid, String, String, String, String, f64, SparseBitVec<B>)>,
 }
 
 
-impl Bitmap {
+impl<B: Integer + Copy + Into<usize>> Bitmap<B> {
     fn new() -> Self {
         Bitmap {
             columns: HashMap::new(),
@@ -62,7 +63,8 @@ struct BackgroundQuery {
 // This structure stores a persistent many-reader single-writer hashmap containing cached indexes for a given background id
 struct PersistentState { 
     fisher: RwLock<FastFisher>,
-    bitmaps: RwLockHashMap<Uuid, Bitmap>,
+    // NOTE: Bitmap<u16> limits the number of genes to 65K -- to support more than that, use u32/u64 at the cost of more memory
+    bitmaps: RwLockHashMap<Uuid, Bitmap<u16>>,
     latest: RwLock<Option<Uuid>>,
     cache: Cache<Arc<BackgroundQuery>, Arc<Vec<PartialQueryResult>>>,
 }
@@ -137,7 +139,7 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
         bitmap.columns.reserve(background_genes.len());
         bitmap.columns_str.reserve(background_genes.len());
         for (i, (gene_id, gene)) in background_genes.into_iter().enumerate() {
-            bitmap.columns.insert(gene_id, i as u32);
+            bitmap.columns.insert(gene_id, i as u16);
             bitmap.columns_str.push(gene);
         }
 
@@ -290,7 +292,7 @@ async fn query(
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
                 .filter_map(|(index, (_row_id, _row_str, _title_str, _attrs, _sig_terms, _silhouette_score, gene_set))| {
-                    let n_overlap = compute_overlap(&background_query.input_gene_set, &gene_set);
+                    let n_overlap = compute_overlap(&background_query.input_gene_set, &gene_set) as u32;
                     if n_overlap < overlap_ge {
                         return None
                     }
