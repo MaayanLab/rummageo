@@ -1,5 +1,6 @@
 mod async_rwlockhashmap;
 mod fastfisher;
+mod bitvec;
 
 #[macro_use] extern crate rocket;
 use async_lock::RwLock;
@@ -23,6 +24,7 @@ use std::time::Instant;
 
 use fastfisher::FastFisher;
 use async_rwlockhashmap::RwLockHashMap;
+use bitvec::{SparseBitVec,DenseBitVec,compute_overlap};
 
 /**
  * Without this alternative allocator, very large chunks of memory do not get released back to the OS causing a large memory footprint over time.
@@ -37,7 +39,7 @@ struct Postgres(sqlx::PgPool);
 struct Bitmap {
     columns: HashMap<Uuid, u32>,
     columns_str: Vec<String>,
-    values: Vec<(Uuid, String, String, String, String, f64, Vec<u32>)>,
+    values: Vec<(Uuid, String, String, String, String, f64, SparseBitVec)>,
 }
 
 
@@ -51,33 +53,10 @@ impl Bitmap {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, PartialOrd, Ord)]
 struct BackgroundQuery {
     background_id: Uuid,
-    input_gene_set: Vec<u8>,
-    input_gene_set_length: u32,
-}
-
-impl PartialOrd for BackgroundQuery {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.background_id.partial_cmp(&other.background_id) {
-            Some(cmp) if cmp != std::cmp::Ordering::Equal => Some(cmp),
-            _ => self.input_gene_set.iter().collect::<Vec<_>>().partial_cmp(
-                &other.input_gene_set.iter().collect::<Vec<_>>()
-            ),
-        }
-    }
-}
-
-impl Ord for BackgroundQuery {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.background_id.cmp(&other.background_id) {
-            std::cmp::Ordering::Equal => self.input_gene_set.iter().collect::<Vec<_>>().cmp(
-                &other.input_gene_set.iter().collect::<Vec<_>>()
-            ),
-            cmp => cmp,
-        }
-    }
+    input_gene_set: DenseBitVec,
 }
 
 // This structure stores a persistent many-reader single-writer hashmap containing cached indexes for a given background id
@@ -129,23 +108,6 @@ impl<'r> Responder<'r, 'static> for QueryResponse {
     }
 }
 
-fn bitvec(background: &HashMap<Uuid, u32>, gene_set: &Vec<Uuid>) -> Vec<u32> {
-    gene_set.iter().filter_map(|gene_id| Some(*background.get(gene_id)?)).collect()
-}
-
-fn bitvec_query(background: &HashMap<Uuid, u32>, gene_set: &Vec<Uuid>) -> Vec<u8> {
-    let mut vec: Vec<u8> = [0].repeat(background.len());
-    for gene_id in gene_set {
-        if let Some(gene_index) = background.get(&gene_id) {
-            vec[*gene_index as usize] = 1;
-        }
-    }
-    vec
-}
-
-fn compute_overlap(a: &Vec<u8>, b: &Vec<u32>) -> u32 {
-    b.iter().map(|i| a[*i as usize] as u32).sum()
-}
 
 // Ensure the specific background_id exists in state, resolving it if necessary
 async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentState>, background_id: Uuid) -> Result<(), String> {
@@ -193,7 +155,7 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
-                let bitset = bitvec(&bitmap.columns, &gene_ids);
+                let bitset = SparseBitVec::new(&bitmap.columns, &gene_ids);
                 bitmap.values.push((gene_set_id, term, title, attrs, sig_terms_str, silhouette_score, bitset));
                 future::ready(())
             })
@@ -248,7 +210,7 @@ async fn get_gmt(
             let mut line = String::new();
             line.push_str(row_str);
             line.push_str("\t");
-            for col_ind in gene_set.iter() {
+            for col_ind in gene_set.v.iter() {
                 line.push_str("\t");
                 line.push_str(&bitmap.columns_str[*col_ind as usize]);
             }
@@ -309,14 +271,13 @@ async fn query(
     let start = Instant::now();
     let input_gene_set = input_gene_set.0.into_iter().map(|gene| Uuid::parse_str(&gene)).collect::<Result<Vec<_>, _>>().map_err(|e| Custom(Status::BadRequest, e.to_string()))?;
     let bitmap = state.bitmaps.get_read(&background_id).await.ok_or(Custom(Status::NotFound, String::from("Can't find background")))?;
-    let input_gene_set_length = input_gene_set.len() as u32;
-    let input_gene_set = bitvec_query(&bitmap.columns, &input_gene_set);
+    let input_gene_set = DenseBitVec::new(&bitmap.columns, &input_gene_set);
     let filter_term = filter_term.and_then(|filter_term| Some(filter_term.to_lowercase()));
     let overlap_ge = overlap_ge.unwrap_or(1);
     let pvalue_le =  pvalue_le.unwrap_or(1.0);
     let adj_pvalue_le =  adj_pvalue_le.unwrap_or(1.0);
     let score_filter = score_filter.unwrap_or(-1.0);
-    let background_query = Arc::new(BackgroundQuery { background_id, input_gene_set, input_gene_set_length });
+    let background_query = Arc::new(BackgroundQuery { background_id, input_gene_set });
     let results = {
         let results = state.cache.get(&background_query).await;
         if let Some(results) = results {
@@ -324,7 +285,7 @@ async fn query(
         } else {
             // parallel overlap computation
             let n_background = bitmap.columns.len() as u32;
-            let n_user_gene_id = background_query.input_gene_set_length;
+            let n_user_gene_id = background_query.input_gene_set.n as u32;
             let fisher = state.fisher.read().await;
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
@@ -333,7 +294,7 @@ async fn query(
                     if n_overlap < overlap_ge {
                         return None
                     }
-                    let n_gs_gene_id = gene_set.len() as u32;
+                    let n_gs_gene_id = gene_set.v.len() as u32;
                     let a = n_overlap;
                     let b = n_user_gene_id - a;
                     let c = n_gs_gene_id - a;
