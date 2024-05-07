@@ -1,8 +1,11 @@
 mod async_rwlockhashmap;
+mod fastfisher;
+mod bitvec;
 
 #[macro_use] extern crate rocket;
 use async_lock::RwLock;
 use futures::StreamExt;
+use num::Integer;
 use rocket::http::ContentType;
 use std::future;
 use std::io::Cursor;
@@ -13,16 +16,16 @@ use rocket_db_pools::sqlx::{self, Row};
 use std::collections::HashMap;
 use rayon::prelude::*;
 use uuid::Uuid;
-use fishers_exact::fishers_exact;
 use adjustp::{adjust, Procedure};
 use rocket::{State, response::status::Custom, http::Status};
 use rocket::serde::{json::{json, Json, Value}, Serialize};
 use std::sync::Arc;
 use retainer::Cache;
 use std::time::Instant;
-use fnv::FnvHashSet;
 
+use fastfisher::FastFisher;
 use async_rwlockhashmap::RwLockHashMap;
+use bitvec::{SparseBitVec,DenseBitVec,compute_overlap};
 
 /**
  * Without this alternative allocator, very large chunks of memory do not get released back to the OS causing a large memory footprint over time.
@@ -34,14 +37,14 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[database("postgres")]
 struct Postgres(sqlx::PgPool);
 
-struct Bitmap {
-    columns: HashMap<Uuid, u32>,
+struct Bitmap<B: Integer + Copy + Into<usize>> {
+    columns: HashMap<Uuid, B>,
     columns_str: Vec<String>,
-    values: Vec<(Uuid, String, String, String, String, f64, FnvHashSet<u32>)>,
+    values: Vec<(Uuid, String, String, String, String, f64, SparseBitVec<B>)>,
 }
 
 
-impl Bitmap {
+impl<B: Integer + Copy + Into<usize>> Bitmap<B> {
     fn new() -> Self {
         Bitmap {
             columns: HashMap::new(),
@@ -51,37 +54,17 @@ impl Bitmap {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, PartialOrd, Ord)]
 struct BackgroundQuery {
     background_id: Uuid,
-    input_gene_set: FnvHashSet<u32>,
-}
-
-impl PartialOrd for BackgroundQuery {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.background_id.partial_cmp(&other.background_id) {
-            Some(cmp) if cmp != std::cmp::Ordering::Equal => Some(cmp),
-            _ => self.input_gene_set.iter().collect::<Vec<&u32>>().partial_cmp(
-                &other.input_gene_set.iter().collect::<Vec<&u32>>()
-            ),
-        }
-    }
-}
-
-impl Ord for BackgroundQuery {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.background_id.cmp(&other.background_id) {
-            std::cmp::Ordering::Equal => self.input_gene_set.iter().collect::<Vec<&u32>>().cmp(
-                &other.input_gene_set.iter().collect::<Vec<&u32>>()
-            ),
-            cmp => cmp,
-        }
-    }
+    input_gene_set: DenseBitVec,
 }
 
 // This structure stores a persistent many-reader single-writer hashmap containing cached indexes for a given background id
 struct PersistentState { 
-    bitmaps: RwLockHashMap<Uuid, Bitmap>,
+    fisher: RwLock<FastFisher>,
+    // NOTE: Bitmap<u16> limits the number of genes to 65K -- to support more than that, use u32/u64 at the cost of more memory
+    bitmaps: RwLockHashMap<Uuid, Bitmap<u16>>,
     latest: RwLock<Option<Uuid>>,
     cache: Cache<Arc<BackgroundQuery>, Arc<Vec<PartialQueryResult>>>,
 }
@@ -127,9 +110,6 @@ impl<'r> Responder<'r, 'static> for QueryResponse {
     }
 }
 
-fn bitvec(background: &HashMap<Uuid, u32>, gene_set: Vec<Uuid>) -> FnvHashSet<u32> {
-    gene_set.iter().filter_map(|gene_id| Some(*background.get(gene_id)?)).collect()
-}
 
 // Ensure the specific background_id exists in state, resolving it if necessary
 async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentState>, background_id: Uuid) -> Result<(), String> {
@@ -152,10 +132,14 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
         let species: String = background_info.try_get("species").map_err(|e| e.to_string())?;
         let mut background_genes = background_genes.iter().map(|(id, symbol)| Ok((Uuid::parse_str(id).map_err(|e| e.to_string())?, symbol.clone()))).collect::<Result<Vec<_>, String>>()?;
         background_genes.sort_unstable();
+        {
+            let mut fisher = state.fisher.write().await;
+            fisher.extend_to(background_genes.len()*4);
+        };
         bitmap.columns.reserve(background_genes.len());
         bitmap.columns_str.reserve(background_genes.len());
         for (i, (gene_id, gene)) in background_genes.into_iter().enumerate() {
-            bitmap.columns.insert(gene_id, i as u32);
+            bitmap.columns.insert(gene_id, i as u16);
             bitmap.columns_str.push(gene);
         }
 
@@ -173,7 +157,7 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
                 let gene_ids: sqlx::types::Json<HashMap<String, sqlx::types::JsonValue>> = row.try_get("gene_ids").unwrap();
                 let gene_ids = gene_ids.keys().map(|gene_id| Uuid::parse_str(gene_id).unwrap()).collect::<Vec<Uuid>>();
-                let bitset = bitvec(&bitmap.columns, gene_ids);
+                let bitset = SparseBitVec::new(&bitmap.columns, &gene_ids);
                 bitmap.values.push((gene_set_id, term, title, attrs, sig_terms_str, silhouette_score, bitset));
                 future::ready(())
             })
@@ -228,7 +212,7 @@ async fn get_gmt(
             let mut line = String::new();
             line.push_str(row_str);
             line.push_str("\t");
-            for col_ind in gene_set.iter() {
+            for col_ind in gene_set.v.iter() {
                 line.push_str("\t");
                 line.push_str(&bitmap.columns_str[*col_ind as usize]);
             }
@@ -289,7 +273,7 @@ async fn query(
     let start = Instant::now();
     let input_gene_set = input_gene_set.0.into_iter().map(|gene| Uuid::parse_str(&gene)).collect::<Result<Vec<_>, _>>().map_err(|e| Custom(Status::BadRequest, e.to_string()))?;
     let bitmap = state.bitmaps.get_read(&background_id).await.ok_or(Custom(Status::NotFound, String::from("Can't find background")))?;
-    let input_gene_set = bitvec(&bitmap.columns, input_gene_set);
+    let input_gene_set = DenseBitVec::new(&bitmap.columns, &input_gene_set);
     let filter_term = filter_term.and_then(|filter_term| Some(filter_term.to_lowercase()));
     let overlap_ge = overlap_ge.unwrap_or(1);
     let pvalue_le =  pvalue_le.unwrap_or(1.0);
@@ -303,22 +287,21 @@ async fn query(
         } else {
             // parallel overlap computation
             let n_background = bitmap.columns.len() as u32;
-            let n_user_gene_id = background_query.input_gene_set.len() as u32;
+            let n_user_gene_id = background_query.input_gene_set.n as u32;
+            let fisher = state.fisher.read().await;
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
                 .filter_map(|(index, (_row_id, _row_str, _title_str, _attrs, _sig_terms, _silhouette_score, gene_set))| {
-                    let n_overlap = gene_set.intersection(&background_query.input_gene_set).count() as u32;
+                    let n_overlap = compute_overlap(&background_query.input_gene_set, &gene_set) as u32;
                     if n_overlap < overlap_ge {
                         return None
                     }
-                    let n_gs_gene_id = gene_set.len() as u32;
+                    let n_gs_gene_id = gene_set.v.len() as u32;
                     let a = n_overlap;
                     let b = n_user_gene_id - a;
                     let c = n_gs_gene_id - a;
                     let d = n_background - b - c + a;
-                    let table = [a, b, c, d];
-                    let result = fishers_exact(&table).map_err(|e| Custom(Status::InternalServerError, e.to_string())).ok()?;
-                    let pvalue = result.greater_pvalue;
+                    let pvalue = fisher.get_p_value(a as usize, b as usize, c as usize, d as usize);
                     if pvalue > pvalue_le {
                         return None
                     }
@@ -402,6 +385,7 @@ async fn query(
 fn rocket() -> _ {
     rocket::build()
         .manage(PersistentState {
+            fisher: RwLock::new(FastFisher::new()),
             bitmaps: RwLockHashMap::new(),
             latest: RwLock::new(None),
             cache: Cache::new(),
