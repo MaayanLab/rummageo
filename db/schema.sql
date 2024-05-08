@@ -950,7 +950,7 @@ COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2
 --
 
 CREATE TABLE public.schema_migrations (
-    version character varying(255) NOT NULL
+    version character varying(128) NOT NULL
 );
 
 
@@ -1248,7 +1248,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20231205200001'),
     ('20231205220323'),
     ('20231206002401'),
-    ('20231206165544'),
     ('20231207235614'),
     ('20240202144258'),
     ('20240202163120'),
