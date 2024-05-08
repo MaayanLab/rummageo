@@ -269,13 +269,13 @@ as $$
 $$ language sql immutable strict parallel safe;
 grant execute on function app_public_v2.gene_set_term_search to guest, authenticated;
 
-/* create table app_public_v2.enrichr_terms (
+create table app_public_v2.enrichr_terms (
   sig varchar not null,
   organism varchar not null,
   sig_terms varchar[],
   enrichr_stats jsonb,
   unique(sig, organism)
-); */
+);
 
 -- migrate:down
 drop function app_public_v2.background_enrich;

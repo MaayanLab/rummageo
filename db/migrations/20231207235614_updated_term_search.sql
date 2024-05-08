@@ -1,5 +1,6 @@
 -- migrate:up
 
+drop function if exists app_public_v2.gene_set_term_search;
 create or replace function app_public_v2.gene_set_term_search(terms varchar[]) returns setof app_public_v2.gene_set_pmid
 as $$
   select distinct gs.*
