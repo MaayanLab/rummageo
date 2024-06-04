@@ -43,7 +43,7 @@ JOIN app_public_v2.terms_count_combined tcc ON tc.term_name = tcc.terms
 GROUP BY tc.category;
 
 
-create function app_private_v2.enrich_functional_terms(
+create or replace function app_private_v2.enrich_functional_terms(
     terms_concat varchar[], source_type varchar, species varchar, category_terms varchar[], total_count bigint, term_counts_json jsonb) returns app_public_v2.enriched_term_result[] as $$
     from scipy.stats import fisher_exact
     from statsmodels.stats.multitest import multipletests
@@ -64,6 +64,8 @@ create function app_private_v2.enrich_functional_terms(
     results = []
     p_values = []
     for term, count in term_counts:
+      if count < 5:
+          continue
       try:
         escaped_term = term.replace("'", "''")
         total_term_count = term_counts_dict.get(term, 0)
