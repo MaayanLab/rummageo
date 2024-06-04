@@ -61,13 +61,9 @@ words_to_remove = ['experiement', 'experiment', 'patient', 'batch', 'tissue', 'c
 
 stopwords_plus = list(set(stopwords.words('english') + (words_to_remove)))
 species = "mouse"
-base_path="/Users/giacomomarino/"
 
-if not os.path.exists(f'gse_gsm_meta_{species}.csv'):
-    version = "2.2"
-    gsm4sig_version = 2
+def create_meta_dict(species: str, version: str, base_path: str = ""):
     single_cell_prob_thresh = 0.5
-    print('reading h5')
     f = h5.File(base_path+species+"_gene_v"+version+".h5", "r")
     gse_scprob = np.array([
         f["meta"]["samples"]["series_id"], 
@@ -80,42 +76,39 @@ if not os.path.exists(f'gse_gsm_meta_{species}.csv'):
 
 
     samps_df = pd.DataFrame(gse_scprob, columns =['gse', 'gsm', 'scprob', 'title','characteristics_ch1', 'source_name_ch1'])
-    samps_df = samps_df[samps_df['scprob'] < .5]
+    samps_df = samps_df[samps_df['scprob'] < single_cell_prob_thresh]
     samps_df['gse'] = samps_df['gse'].apply(lambda s: s.decode("utf-8"))
     samps_df['gsm'] = samps_df['gsm'].apply(lambda s: s.decode("utf-8"))
     samps_df['title'] = samps_df['title'].apply(lambda s: s.decode("utf-8"))
     samps_df['characteristics_ch1'] = samps_df['characteristics_ch1'].apply(lambda s: s.decode("utf-8"))
     samps_df['source_name_ch1'] = samps_df['source_name_ch1'].apply(lambda s: s.decode("utf-8"))
-    samps_df.to_csv(f'./ETL/out/gse_gsm_meta_{species}.csv')
-else:
-    samps_df = pd.read_csv(f'./ETL/out/gse_gsm_meta_{species}.csv', index_col=0)
 
-with open('./ETL/out/gse_groupings_mouse.json') as f:
-    gse_groupings = json.load(f)
+    with open(f'out/gse_groupings_{species}_{version}.json') as f:
+        gse_groupings = json.load(f)
 
-gse_processed_meta = {}
-for gse in tqdm(list(gse_groupings)):
-    gse_table = samps_df[samps_df['gse'] == gse]
-    meta_names = gse_table['title'] + ' ' +  gse_table['characteristics_ch1'] + ' ' +  gse_table['source_name_ch1']
-    data = list(map(lambda s: ' '.join(re.split(r',|-|:|;|_', str(s).lower())), meta_names.values))
-    data_clean = []
-    for d in data:
-        data_clean.append(clean_str(d, stopwords_plus))
-    gsm_title_dict = {}
+    gse_processed_meta = {}
+    for gse in tqdm(list(gse_groupings)):
+        gse_table = samps_df[samps_df['gse'] == gse]
+        meta_names = gse_table['title'] + ' ' +  gse_table['characteristics_ch1'] + ' ' +  gse_table['source_name_ch1']
+        data = list(map(lambda s: ' '.join(re.split(r',|-|:|;|_', str(s).lower())), meta_names.values))
+        data_clean = []
+        for d in data:
+            data_clean.append(clean_str(d, stopwords_plus))
+        gsm_title_dict = {}
 
-    for i, d in enumerate(data_clean):
-        gsm_title_dict[gse_table['gsm'].values[i]] = d
+        for i, d in enumerate(data_clean):
+            gsm_title_dict[gse_table['gsm'].values[i]] = d
 
-    gse_processed_meta[gse] = {'titles': {}}
+        gse_processed_meta[gse] = {'titles': {}}
 
-    for cond in gse_groupings[gse]:
-        gsms = gse_groupings[gse][cond]
-        gsm_strs = [gsm_title_dict[gsm] for gsm in gsms]
-        gse_processed_meta[gse]['titles'][cond] = common_words_across_strings(gsm_strs)
-    gse_processed_meta[gse]['samples'] = gse_groupings[gse]
+        for cond in gse_groupings[gse]:
+            gsms = gse_groupings[gse][cond]
+            gsm_strs = [gsm_title_dict[gsm] for gsm in gsms]
+            gse_processed_meta[gse]['titles'][cond] = common_words_across_strings(gsm_strs)
+        gse_processed_meta[gse]['samples'] = gse_groupings[gse]
 
 
-with open(f'./ETL/out/gse_processed_meta_{species}.json', 'w') as f:
-    json.dump(gse_processed_meta, f)
+    with open(f'out/gse_processed_meta_{species}_{version}.json', 'w') as f:
+        json.dump(gse_processed_meta, f)
 
     
