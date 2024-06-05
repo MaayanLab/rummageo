@@ -1,0 +1,15 @@
+pandas
+numpy
+matplotlib
+scipy
+plotly
+bokeh
+seaborn
+kaleido
+scikit-learn
+umap
+requests
+tqdm
+git+https://github.com/Maayanlab/maayanlab-bioinformatics.git
+umap-learn
+glasbey
