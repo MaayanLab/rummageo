@@ -16,7 +16,7 @@ loadedLibs = {
 #%%
 for l in libraries:
     lib = {}
-    with open(f'data/enrichr_libs/{l}.txt') as f:
+    with open(f'enrichr_libs/{l}.txt') as f:
         lines = f.readlines()
     for line in lines:
         split_line = line.replace('\n', '').split('\t')
@@ -47,10 +47,10 @@ def get_enrichr_labels(term, gene_list, loadedLibs = loadedLibs):
     return enrichr_results
 
 
-def get_enrichr_labels(species: str, version: str):
+def compute_enrichr_labels(species: str, version: str):
         gene_lists = []
         terms = []
-        with open(f'out/{species}-geo-auto_{version}.gmt') as fr:
+        with open(f'out/gmts/{species}-geo-auto_{version}.gmt') as fr:
             lines = fr.readlines()
         for l in tqdm(lines):
             l = l.replace('\n', '')
@@ -75,8 +75,7 @@ def get_enrichr_labels(species: str, version: str):
                 json.dump(results + enrichr_terms, f)
         else:
             inputs = zip(terms, gene_lists)
-            with mp.Pool(os.cpu_count()) as pool:
+            with mp.Pool(os.cpu_count() // 2) as pool:
                 results = pool.starmap(get_enrichr_labels, tqdm(inputs, total=len(terms)))
             with open(f'out/enrichr_terms_{species}_{version}.json', 'w') as f:
                 json.dump(results, f)
-    

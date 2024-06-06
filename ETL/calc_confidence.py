@@ -1,4 +1,5 @@
 import re
+import os
 import json
 import h5py as h5
 import numpy as np
@@ -29,15 +30,15 @@ def log2_normalize(x, offset=1.):
     return np.log2(x + offset)
 
 
-species = 'mouse'
-version = '2.2'
-
 def compute_confidence(species: str, version: str, base_path: str = ""):
-    with open(f'gse_processed_meta_{species}.json') as f:
+    if os.path.exists(f'out/gse_processed_meta_{species}_{version}_conf.json'):
+        return
+    
+    with open(f'out/gse_processed_meta_{species}_{version}.json') as f:
         gse_processed_meta = json.load(f)
 
     f = h5.File(f"{base_path}{species}_gene_v{version}.h5", "r")
-    expression = f['data/expression']
+
     genes = [x.decode('UTF-8') for x in f['meta/genes/symbol']]
     samples = [x.decode('UTF-8') for x in f['meta/samples/geo_accession']] 
 
@@ -61,7 +62,8 @@ def compute_confidence(species: str, version: str, base_path: str = ""):
         samples_idx = sorted([i for i, x in enumerate(samples) if x in gsms])
 
         expression_data = f['data/expression'][:, samples_idx]
-        samples_readsaligned = f['meta']['samples']['readsaligned'][samples_idx]
+        #samples_readsaligned = f['meta']['samples']['readsaligned'][samples_idx]
+        samples_readsaligned = np.sum(expression_data, axis=0)
         expression_data = np.divide(expression_data, samples_readsaligned)
 
         expr_df = pd.DataFrame(data=expression_data, index=genes, columns=gsms)

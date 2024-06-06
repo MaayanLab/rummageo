@@ -63,6 +63,9 @@ stopwords_plus = list(set(stopwords.words('english') + (words_to_remove)))
 species = "mouse"
 
 def create_meta_dict(species: str, version: str, base_path: str = ""):
+    if os.path.exists(f'out/gse_processed_meta_{species}_{version}.json'):
+        return
+    
     single_cell_prob_thresh = 0.5
     f = h5.File(base_path+species+"_gene_v"+version+".h5", "r")
     gse_scprob = np.array([

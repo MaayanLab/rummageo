@@ -20,10 +20,11 @@ def get_embeddings(sentences):
 pd.options.mode.chained_assignment = None
 
 def partition_samples(species: str, version: str, base_path: str = ""):
-
+    if os.path.exists(f'out/gse_groupings_{species}_{version}.json'):
+        return
     os.makedirs('out', exist_ok=True)
 
-    file = f'{base_path}+{species}_gene_v{version}.h5'
+    file = f'{base_path}{species}_gene_v{version}.h5'
     single_cell_prob_thresh = 0.5
 
     f = h5.File(file, "r")
@@ -51,34 +52,26 @@ def partition_samples(species: str, version: str, base_path: str = ""):
         processed = json.load(fr)
 
     gses_processed = []
-    for version in processed[species]:
-        gses_processed.extend(list(processed[species][version]))
-    if version not in processed[species]:
+    for v in processed[species]:
+        gses_processed.extend(list(processed[species][v]))
+    
+    if version not in list(processed[species].keys()):
         to_process = list(set(samps_df['gse'].values).difference(gses_processed))
         processed[species][version] = to_process
-        with open('processed.json', 'w') as fw:
-            json.dump(processed, fw)
-
-    # %%
     
     samps_df = samps_df[samps_df['gse'].isin(to_process)]
-    # %%
-    if not os.path.exists(f'valid_{species}_{version}.json'):
-        valid = set()
-        checked = set()
-        for i, row in tqdm(samps_df.iterrows(), total=len(samps_df)):
-            if row['gse'] in checked:
-                continue
-            samps = samps_df[samps_df['gse'] == row['gse']]
-            n_samps = len(samps)
-            if n_samps >= 6 and n_samps < 50:
-                valid.add(row['gse'])
-            checked.add(row['gse'])
-        with open(f'valid_{species}.json', 'w') as fo:
-            json.dump(list(valid), fo)
-    else:
-        with open(f'valid_{species}.json') as fr:
-            valid = json.load(fr)
+
+    
+    valid = set()
+    checked = set()
+    for i, row in tqdm(samps_df.iterrows(), total=len(samps_df)):
+        if row['gse'] in checked:
+            continue
+        samps = samps_df[samps_df['gse'] == row['gse']]
+        n_samps = len(samps)
+        if n_samps >= 6 and n_samps < 50:
+            valid.add(row['gse'])
+        checked.add(row['gse'])
     
     # %%
     words_to_remove = ['experiement', 'experiment', 'patient', 'batch', '1', '2', '3', '4', '5', '6', '7', '8', '9']
@@ -111,3 +104,6 @@ def partition_samples(species: str, version: str, base_path: str = ""):
 
     with open(f'out/gse_groupings_{species}_{version}.json', 'w') as fw:
         json.dump(gse_dict, fw)
+    
+    with open('processed.json', 'w') as fw:
+        json.dump(processed, fw)

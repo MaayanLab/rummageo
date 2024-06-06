@@ -85,7 +85,7 @@ def compute_sigs(expr_df, groupings, species, gse, gse_table, version):
 
                 sig_name = f"{gse}-{og_labels[condition]}-vs-{og_labels[condition2]}-{species}"
 
-                if not os.path.exists(f'data_{species}_{version}/{sig_name}.tsv.gz'):
+                if not os.path.exists(f'out/data_{species}_{version}/{sig_name}.tsv.gz'):
                     try:
                         with suppress_output():
                             dge = limma_voom_differential_expression(
@@ -97,7 +97,7 @@ def compute_sigs(expr_df, groupings, species, gse, gse_table, version):
                             dge['AveExpr'] = dge['AveExpr'].round(2)
                             dge['t'] = dge['t'].round(2)
                             dge['B'] = dge['B'].round(2)
-                            dge.to_csv(f'data_{species}_{version}/{sig_name}.tsv.gz', sep='\t', compression='gzip')
+                            dge.to_csv(f'out/data_{species}_{version}/{sig_name}.tsv.gz', sep='\t', compression='gzip')
                         else:
                             print('Empty dge returned for', sig_name)
                     except Exception as e:
@@ -107,8 +107,8 @@ def compute_sigs(expr_df, groupings, species, gse, gse_table, version):
 
 # %%
 def run_compute_sigs(species: str, version: str, base_path: str = ""):
-    os.makedirs(f'data_{species}_{version}', exist_ok=True)
-    with open(f'gse_groupings_{species}_{version}.json') as fr:
+    os.makedirs(f'out/data_{species}_{version}', exist_ok=True)
+    with open(f'out/gse_groupings_{species}_{version}.json') as fr:
         gse_groupings = json.load(fr)
 
     f = h5.File(base_path + species+"_gene_v"+version+".h5", "r")
