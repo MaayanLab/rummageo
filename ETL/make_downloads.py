@@ -19,10 +19,15 @@ def make_downloads():
                     shutil.copyfileobj(fd, wfd)
 
         species_metas = [f for f in metas if species in f]
-        with open(f'out/downloads/{species}-gse-processed-meta.json','wb') as wfd:
-            for f in species_metas:
-                with open(f'out/meta/{f}','rb') as fd:
-                    shutil.copyfileobj(fd, wfd)
-        
+        meta_dict_combined = {}
+        for f in species_metas:
+            print(f)
+            with open(f'out/meta/{f}','rb') as fd:
+                meta_dict_combined = meta_dict_combined | json.load(fd)
+        with open(f'out/downloads/{species}-gse-processed-meta.json','w') as wfd:
+            json.dump(meta_dict_combined, wfd)
+
+
+make_downloads() 
 
 
