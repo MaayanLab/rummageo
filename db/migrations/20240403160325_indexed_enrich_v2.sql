@@ -1,5 +1,8 @@
 -- migrate:up
 
+drop function app_public_v2.background_enrich(app_public_v2.background, varchar[], varchar, int, double precision, double precision, int, int, double precision);
+drop function app_private_v2.indexed_enrich(app_public_v2.background, uuid[], varchar, int, double precision, double precision, int, int, double precision);
+
 drop type app_public_v2.paginated_enrich_result cascade;
 
 create type app_public_v2.paginated_enrich_result as (
@@ -18,7 +21,9 @@ create or replace function app_private_v2.indexed_enrich(
   adj_pvalue_le double precision default 0.05,
   "offset" int default null,
   "first" int default null,
-  filter_score_le double precision default -1
+  filter_score_le double precision default -1,
+  sort_by varchar default null,
+  sort_by_dir varchar default null
 ) returns app_public_v2.paginated_enrich_result as $$
   import requests
   import json
@@ -27,7 +32,9 @@ create or replace function app_private_v2.indexed_enrich(
     overlap_ge=overlap_ge,
     pvalue_le=pvalue_le,
     adj_pvalue_le=adj_pvalue_le,
-    score_filter=filter_score_le
+    score_filter=filter_score_le,
+    sort_by=sort_by,
+    sort_by_dir=sort_by_dir
   )
   if filter_term: params['filter_term'] = filter_term
   if offset: params['offset'] = offset
@@ -56,7 +63,7 @@ create or replace function app_private_v2.indexed_enrich(
   return dict(nodes=req_json['results'], total_count=total_count, enriched_terms=enriched_terms_top_gses, top_enriched_sigs=enriched_terms_top_sigs)
 $$ language plpython3u immutable parallel safe;
 
-create or replace function app_public_v2.background_enrich(
+create function app_public_v2.background_enrich(
   background app_public_v2.background,
   genes varchar[],
   filter_term varchar default null,
@@ -65,7 +72,9 @@ create or replace function app_public_v2.background_enrich(
   adj_pvalue_le double precision default 0.05,
   "offset" int default null,
   "first" int default null,
-  filter_score_le double precision default -1
+  filter_score_le double precision default -1,
+  sort_by varchar default null,
+  sort_by_dir varchar default null
 ) returns app_public_v2.paginated_enrich_result
 as $$
   select r.*
@@ -78,7 +87,9 @@ as $$
     background_enrich.adj_pvalue_le,
     background_enrich."offset",
     background_enrich."first",
-    background_enrich.filter_score_le
+    background_enrich.filter_score_le,
+    background_enrich.sort_by,
+    background_enrich.sort_by_dir
   ) r;
 $$ language sql immutable parallel safe security definer;
 grant execute on function app_public_v2.background_enrich to guest, authenticated;
@@ -86,3 +97,5 @@ grant execute on function app_public_v2.background_enrich to guest, authenticate
 
 -- migrate:down
 
+drop function app_public_v2.background_enrich(app_public_v2.background, varchar[], varchar, int, double precision, double precision, int, int, double precision, varchar);
+drop function app_private_v2.indexed_enrich(app_public_v2.background, uuid[], varchar, int, double precision, double precision, int, int, double precision, varchar);

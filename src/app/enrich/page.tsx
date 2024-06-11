@@ -31,6 +31,7 @@ import { TiDeleteOutline } from "react-icons/ti";
 import { FaFilter } from "react-icons/fa";
 import { MdOutlineFileDownload } from "react-icons/md";
 import { RiAiGenerate } from "react-icons/ri";
+import { FaSort } from "react-icons/fa";
 import classNames from "classnames";
 
 const pageSize = 8;
@@ -89,21 +90,23 @@ function EnrichmentResults({
   backgrounds?.backgrounds?.nodes?.forEach((background) => {
     backgroundIds[background?.species ?? ""] = background?.id ?? "";
   });
-  const [queryString, setQueryString] = useQsState({ page: "1", q: "" });
+  const [queryString, setQueryString] = useQsState({ page: "1", q: "", sortBy: "pvalue", sortByDir: "asc"});
   const [rawTerm, setRawTerm] = React.useState("");
   const [enrichedTerms, setEnrichedTerms] = React.useState<(string | null)[]>();
   const [topEnrichedSigs, setTopEnrichedSigs] =
     React.useState<(string | null)[]>();
   const [filterScore, setFilterScore] = React.useState(-1);
   const [filterScoreSilder, setFilterScoreSilder] = React.useState(-1);
-  const { page, term } = React.useMemo(
+  const { page, term, sortBy, sortByDir } = React.useMemo(
     () => ({
-      page: queryString.page ? +queryString.page : 1,
+      page: queryString.page ? + queryString.page : 1,
       term: queryString.q ?? "",
+      sortBy: queryString.sortBy ?? "pvalue",
+      sortByDir: queryString.sortByDir ?? "asc",
     }),
     [queryString]
   );
-  const { data: enrichmentResults } = useEnrichmentQueryQuery({
+  const { data: enrichmentResults, refetch } = useEnrichmentQueryQuery({
     skip: genes.length === 0,
     variables: {
       genes,
@@ -112,6 +115,8 @@ function EnrichmentResults({
       first: pageSize,
       id: backgroundIds[species],
       filterScoreLe: filterScore,
+      sortBy: sortBy,
+      sortByDir: sortByDir,
     },
   });
 
@@ -147,6 +152,16 @@ function EnrichmentResults({
       species: species,
     },
   });
+
+  function setSort(sortByCol: string) {
+    if (sortByCol === sortBy) {
+      setQueryString({page: "1", q: term, sortByDir: sortByDir === "asc" ? "desc" : "asc", sortBy: sortByCol});
+      refetch({sortByDir: sortByDir === "asc" ? "desc" : "asc" ,sortBy: sortByCol})
+    } else {
+      setQueryString({page: "1", q: term, sortByDir: sortByDir, sortBy: sortByCol});
+      refetch({sortByDir:sortByDir, sortBy: sortByCol})
+    } 
+  }
 
   return (
     <div className="flex flex-col gap-2 my-2">
@@ -271,7 +286,7 @@ function EnrichmentResults({
               <button
                 className="btn bg-transparent"
                 onClick={() => {
-                  setQueryString({ page: "1", q: "" })
+                  setQueryString({ page: "1", q: "", sortBy: sortBy, sortByDir: sortByDir})
                   setFilterScore(filterScoreSilder)
                 }
                   
@@ -284,7 +299,7 @@ function EnrichmentResults({
               className="join flex flex-row place-content-end place-items-center"
               onSubmit={(evt) => {
                 evt.preventDefault();
-                setQueryString({ page: "1", q: rawTerm });
+                setQueryString({ page: "1", q: rawTerm, sortBy: sortBy, sortByDir: sortByDir});
               }}
             >
               <input
@@ -308,7 +323,7 @@ function EnrichmentResults({
                   type="reset"
                   className="btn join-item bg-transparent"
                   onClick={(evt) => {
-                    setQueryString({ page: "1", q: "" });
+                    setQueryString({ page: "1", q: "",  sortBy: sortBy, sortByDir: sortByDir});
                   }}
                 >
                   <TiDeleteOutline />
@@ -350,15 +365,15 @@ function EnrichmentResults({
                     <th>Title</th>
                     <th>Condition 1</th>
                     <th>Condition 2</th>
-                    <th>Direction</th>
+                    <th><span className="flex align-text-top cursor-pointer" onClick={() => setSort("direction")}>Direction <FaSort size={15} /></span></th>
                     <th className="hidden  2xl:table-cell">Platform</th>
                     <th className="hidden  2xl:table-cell">Date</th>
-                    <th>Gene Set Size</th>
-                    <th>Overlap</th>
-                    <th className="hidden  2xl:table-cell">Odds</th>
-                    <th className="hidden  2xl:table-cell">PValue</th>
-                    <th>AdjPValue</th>
-                    <th className="hidden  2xl:table-cell">Silhouette Score</th>
+                    <th><span className="flex align-text-top cursor-pointer" onClick={() => setSort("size")}>Gene Set Size <FaSort size={15}  /></span></th>
+                    <th ><span className="flex align-text-top cursor-pointer" onClick={() => setSort("n_overlap")}>Overlap<FaSort size={15}/></span></th>
+                    <th className="hidden  2xl:table-cell"><span className="flex align-text-top cursor-pointer" onClick={() => setSort("odds_ratio")}>Odds<FaSort size={15}/></span></th>
+                    <th className="hidden  2xl:table-cell"><span className="flex align-text-top cursor-pointer" onClick={() => setSort("pvalue")}>PValue<FaSort size={15}/></span></th>
+                    <th><span className="flex align-text-top cursor-pointer" onClick={() => setSort("pvalue")}>Adj. PValue<FaSort size={15}/></span></th>
+                    <th className="hidden  2xl:table-cell"><span className="flex align-text-top cursor-pointer" onClick={() => setSort("silhouette_score")}>Silhouette Score<FaSort size={15}/></span></th>
                     <th>Hypothesis</th>
                     <th>Enrichr Terms</th>
                   </tr>
@@ -699,7 +714,7 @@ function EnrichmentResults({
                 }
                 pageSize={pageSize}
                 onChange={(page) => {
-                  setQueryString({ page: `${page}`, q: term });
+                  setQueryString({ page: `${page}`, q: term, sortBy: sortBy, sortByDir: sortByDir });
                 }}
               />
             </div>

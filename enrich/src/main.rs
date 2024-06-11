@@ -70,12 +70,16 @@ struct PersistentState {
 }
 
 // The response data, containing the ids, and relevant metrics
+#[derive(Clone)]
 struct PartialQueryResult {
     index: usize,
     n_overlap: u32,
     odds_ratio: f64,
     pvalue: f64,
     adj_pvalue: f64,
+    direction: String,
+    n_gs_gene_id: u32,
+    silhouette_score: f64,
 }
 
 #[derive(Serialize, Debug)]
@@ -151,7 +155,8 @@ async fn ensure_index(db: &mut Connection<Postgres>, state: &State<PersistentSta
                 let gene_set_id: uuid::Uuid = row.try_get("id").unwrap();
                 let term: String = row.try_get("term").unwrap();
                 let title: String = row.try_get("title").unwrap();
-                let attrs: String = row.try_get("gse_attrs").unwrap();
+                let attrs: Result<Option<String>, _> = row.try_get("gse_attrs");
+                let attrs = attrs.unwrap_or_else(|_| None).unwrap_or_default();
                 let sig_terms: Option<Vec<String>> = row.try_get("sig_terms").unwrap_or_default();
                 let sig_terms_str = sig_terms.map(|terms| terms.join(" ")).unwrap_or_else(|| String::new());
                 let silhouette_score: f64 = row.try_get("silhouette_score").unwrap_or_default();
@@ -247,7 +252,7 @@ async fn delete(
 // query a specific background_id, providing the bitset vector as input
 //  the result are the gene_set_ids & relevant metrics
 // this can be pretty fast since the index is saved in memory and the overlaps can be computed in parallel
-#[post("/<background_id>?<filter_term>&<overlap_ge>&<pvalue_le>&<adj_pvalue_le>&<offset>&<limit>&<score_filter>", data = "<input_gene_set>")]
+#[post("/<background_id>?<filter_term>&<overlap_ge>&<pvalue_le>&<adj_pvalue_le>&<offset>&<limit>&<score_filter>&<sort_by>&<sort_by_dir>", data = "<input_gene_set>")]
 async fn query(
     mut db: Connection<Postgres>,
     state: &State<PersistentState>,
@@ -259,7 +264,9 @@ async fn query(
     adj_pvalue_le: Option<f64>,
     offset: Option<usize>,
     limit: Option<usize>,
-    score_filter: Option<f64>
+    score_filter: Option<f64>,
+    sort_by: Option<String>,
+    sort_by_dir: Option<String>
 ) -> Result<QueryResponse, Custom<String>> {
     let background_id = {
         if background_id == "latest" {
@@ -279,6 +286,8 @@ async fn query(
     let pvalue_le =  pvalue_le.unwrap_or(1.0);
     let adj_pvalue_le =  adj_pvalue_le.unwrap_or(1.0);
     let score_filter = score_filter.unwrap_or(-1.0);
+    let sort_by = sort_by.unwrap_or("pvalue".to_string());
+    let sort_by_dir = sort_by_dir.unwrap_or("asc".to_string());
     let background_query = Arc::new(BackgroundQuery { background_id, input_gene_set });
     let results = {
         let results = state.cache.get(&background_query).await;
@@ -291,7 +300,7 @@ async fn query(
             let fisher = state.fisher.read().await;
             let mut results: Vec<_> = bitmap.values.par_iter()
                 .enumerate()
-                .filter_map(|(index, (_row_id, _row_str, _title_str, _attrs, _sig_terms, _silhouette_score, gene_set))| {
+                .filter_map(|(index, (_row_id, row_str, _title_str, _attrs, _sig_terms, silhouette_score, gene_set))| {
                     let n_overlap = compute_overlap(&background_query.input_gene_set, &gene_set) as u32;
                     if n_overlap < overlap_ge {
                         return None
@@ -305,8 +314,9 @@ async fn query(
                     if pvalue > pvalue_le {
                         return None
                     }
+                    let direction = row_str.split_whitespace().last().unwrap_or("").to_string();
                     let odds_ratio = ((n_overlap as f64) / (n_user_gene_id as f64)) / ((n_gs_gene_id as f64) / (n_background as f64));
-                    Some(PartialQueryResult { index, n_overlap, odds_ratio, pvalue, adj_pvalue: 1.0 })
+                    Some(PartialQueryResult { index, n_overlap, odds_ratio, pvalue ,adj_pvalue: 1.0, direction, n_gs_gene_id, silhouette_score: *silhouette_score })
                 })
                 .collect();
             // extract pvalues from results and compute adj_pvalues
@@ -322,16 +332,41 @@ async fn query(
                 }
                 result.adj_pvalue <= adj_pvalue_le
             });
-            results.sort_unstable_by(|a, b| a.pvalue.partial_cmp(&b.pvalue).unwrap_or(std::cmp::Ordering::Equal));
+
             let results = Arc::new(results);
             state.cache.insert(background_query, results.clone(), 30000).await;
             let duration = start.elapsed();
-            println!("[{}] {} genes enriched in {:?}", background_id, n_user_gene_id, duration);
+            println!("[{}] {} genes enriched in {:?} sorted by {} {}", background_id, n_user_gene_id, duration, sort_by, sort_by_dir);
             results
         }
     };
+    // Assuming `results` is of type Arc<Vec<PartialQueryResult>>
+    // Clone the data out of the Arc for sorting
+    let mut results_vec: Vec<PartialQueryResult> = (*results).clone();
+
+    // Perform the sorting on the cloned data
+    results_vec.sort_unstable_by(|a, b| {
+        let order = match sort_by.as_str() {
+            "pvalue" => a.pvalue.partial_cmp(&b.pvalue).unwrap_or(std::cmp::Ordering::Equal),
+            "adj_pvalue" => a.adj_pvalue.partial_cmp(&b.adj_pvalue).unwrap_or(std::cmp::Ordering::Equal),
+            "odds_ratio" => a.odds_ratio.partial_cmp(&b.odds_ratio).unwrap_or(std::cmp::Ordering::Equal),
+            "n_overlap" => a.n_overlap.partial_cmp(&b.n_overlap).unwrap_or(std::cmp::Ordering::Equal),
+            "size" => a.n_gs_gene_id.partial_cmp(&b.n_gs_gene_id).unwrap_or(std::cmp::Ordering::Equal),
+            "silhouette_score" => a.silhouette_score.partial_cmp(&b.silhouette_score).unwrap_or(std::cmp::Ordering::Equal),
+            "direction" => a.direction.partial_cmp(&b.direction).unwrap_or(std::cmp::Ordering::Equal),
+            _ => a.pvalue.partial_cmp(&b.pvalue).unwrap_or(std::cmp::Ordering::Equal),
+        };
+        // Adjust the sorting direction based on sort_by_dir
+        match sort_by_dir.as_str() {
+            "desc" => order.reverse(),
+            _ => order,
+        }
+    });
+
+    // Wrap the sorted data back into a new Arc
+    let sorted_results = Arc::new(results_vec);
     let mut all_enriched_terms: Vec<String> = Vec::new();
-    let mut results: Vec<_> = results
+    let mut results: Vec<_> = sorted_results
         .iter()
         .filter_map(|result| {
             let (gene_set_id, gene_set_term, title, attrs, sig_terms, silhouette_score, _gene_set) = bitmap.values.get(result.index)?;
