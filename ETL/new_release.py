@@ -4,6 +4,7 @@ from compute_signatures import *
 from calc_confidence import *
 from create_meta_dict import *
 from enrichr_tags import *
+from extract_key_terms import *
 from create_gmt import *
 from make_downloads import *
 
@@ -20,6 +21,8 @@ def new_release(species: str, version: str, base_path: str = ""):
     create_gmt(species, version)
     print("Computing Enrichr tags for", species, version)
     compute_enrichr_labels(species, version)
+    print("Generating and categorizing key terms for", species, version)
+    generate_key_terms(species, version)
     print("Creating updated download files")
     make_downloads(species, version)
 

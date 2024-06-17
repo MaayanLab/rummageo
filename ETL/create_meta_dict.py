@@ -57,14 +57,13 @@ def common_words_across_strings(string_list):
     return result
 
 words_to_remove = ['experiement', 'experiment', 'patient', 'batch', 'tissue', 'cell type', 'cel type:', 'treatment', 'genotype', 'time point', 'animal', 'datatype']
-
-
 stopwords_plus = list(set(stopwords.words('english') + (words_to_remove)))
-species = "mouse"
 
 def create_meta_dict(species: str, version: str, base_path: str = ""):
-    if os.path.exists(f'out/gse_processed_meta_{species}_{version}.json'):
+    if os.path.exists(f'out/meta/gse_processed_meta_{species}_{version}.json'):
         return
+    
+    os.makedirs('out/meta', exist_ok=True)
     
     single_cell_prob_thresh = 0.5
     f = h5.File(base_path+species+"_gene_v"+version+".h5", "r")
@@ -86,7 +85,7 @@ def create_meta_dict(species: str, version: str, base_path: str = ""):
     samps_df['characteristics_ch1'] = samps_df['characteristics_ch1'].apply(lambda s: s.decode("utf-8"))
     samps_df['source_name_ch1'] = samps_df['source_name_ch1'].apply(lambda s: s.decode("utf-8"))
 
-    with open(f'out/gse_groupings_{species}_{version}.json') as f:
+    with open(f'out/partitions/gse_groupings_{species}_{version}.json') as f:
         gse_groupings = json.load(f)
 
     gse_processed_meta = {}
@@ -111,7 +110,7 @@ def create_meta_dict(species: str, version: str, base_path: str = ""):
         gse_processed_meta[gse]['samples'] = gse_groupings[gse]
 
 
-    with open(f'out/gse_processed_meta_{species}_{version}.json', 'w') as f:
+    with open(f'out/meta/gse_processed_meta_{species}_{version}.json', 'w') as f:
         json.dump(gse_processed_meta, f)
 
     

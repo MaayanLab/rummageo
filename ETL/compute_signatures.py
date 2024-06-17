@@ -108,7 +108,7 @@ def compute_sigs(expr_df, groupings, species, gse, gse_table, version):
 # %%
 def run_compute_sigs(species: str, version: str, base_path: str = ""):
     os.makedirs(f'out/data_{species}_{version}', exist_ok=True)
-    with open(f'out/gse_groupings_{species}_{version}.json') as fr:
+    with open(f'out/partitions/gse_groupings_{species}_{version}.json') as fr:
         gse_groupings = json.load(fr)
 
     f = h5.File(base_path + species+"_gene_v"+version+".h5", "r")

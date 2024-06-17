@@ -5,11 +5,10 @@ from tqdm import tqdm
 from maayanlab_bioinformatics.enrichment import enrich_crisp
 import multiprocessing as mp
 from statsmodels.stats.multitest import multipletests
-
+import pyenrichr as pye
 
 libraries = [
      'ChEA_2022', 'KEGG_2021_Human', 'WikiPathway_2023_Human', 'GO_Biological_Process_2023', 'MGI_Mammalian_Phenotype_Level_4_2021', 'Human_Phenotype_Ontology', 'GWAS_Catalog_2023']
-
 loadedLibs = {
 }
 
@@ -20,8 +19,10 @@ for l in libraries:
         lines = f.readlines()
     for line in lines:
         split_line = line.replace('\n', '').split('\t')
-        lib[split_line[0]] = split_line[2:]
+        lib[split_line[0]] = set(split_line[2:])
     loadedLibs[l] = lib
+
+fisher = pye.enrichment.FastFisher(34000)
 
 def get_enrichr_labels(term, gene_list, loadedLibs = loadedLibs):
     enrichr_results = {}   
@@ -29,20 +30,18 @@ def get_enrichr_labels(term, gene_list, loadedLibs = loadedLibs):
     enrichr_results[term] = {}
     gene_list = [g.upper() for g in gene_list]
     for lib in libraries:
-        enrich_res = enrich_crisp(gene_list, loadedLibs[lib], n_background_entities=21000)
-        res_sorted = list(sorted(enrich_res, key=lambda x: x[1].pvalue))
-        p_values = list(map(lambda x: x[1].pvalue, res_sorted))
-        if res_sorted == []:
+        enrich_res = pye.enrichment.fisher(gene_list, loadedLibs[lib], fisher=fisher, background_size=21000)
+        sig_enrich_res = enrich_res[enrich_res['fdr'] < 0.05]
+
+        if len(sig_enrich_res) == 0:
             enrichr_results[term][lib] = []
             continue
-        try:
-            adjusted_p_values = multipletests(p_values, method='fdr_bh', is_sorted=True)[1]
-        except Exception as e:
-            print(e, p_values, res_sorted, term, gene_list, lib)
-            adjusted_p_values = [1, 1, 1]
+        sig_enrich_res.reset_index(drop=True, inplace=True)
         enriched_term = []
-        for i, r in enumerate(res_sorted[:3]):
-            enriched_term.append([r[0], r[1].pvalue, adjusted_p_values[i], r[1].odds_ratio, r[1].n_overlap])
+        for i, r in sig_enrich_res.iterrows():
+            enriched_term.append([r['term'], r['p-value'], r['fdr'], r['odds'], r['overlap']])
+            if i == 2:
+                break
         enrichr_results[term][lib] = enriched_term
     return enrichr_results
 
@@ -57,25 +56,8 @@ def compute_enrichr_labels(species: str, version: str):
             split_line = l.split('\t')
             terms.append((split_line[0], split_line[1]))
             gene_lists.append(split_line[2:])
-        
-        if os.path.exists(f'out/enrichr_terms_{species}_{version}.json'):
-            with open(f'out/enrichr_terms_{species}_{version}.json') as f:
-                enrichr_terms = json.load(f)
-            terms_to_enrich = []
-            genesets_to_enrich = []
-            enriched_terms_done = set([item.keys()[0] for item in enrichr_terms])
-            for i in range(len(terms)):
-                if terms[i][0] not in enriched_terms_done:
-                    terms_to_enrich.append(terms[i])
-                    genesets_to_enrich.append(gene_lists = gene_lists[i])
-            inputs = zip(terms_to_enrich, genesets_to_enrich)
-            with mp.Pool(os.cpu_count()) as pool:
-                results = pool.starmap(get_enrichr_labels, tqdm(inputs, total=len(terms)))
-            with open(f'out/enrichr_terms_{species}_{version}.json', 'w') as f:
-                json.dump(results + enrichr_terms, f)
-        else:
-            inputs = zip(terms, gene_lists)
-            with mp.Pool(os.cpu_count() // 2) as pool:
-                results = pool.starmap(get_enrichr_labels, tqdm(inputs, total=len(terms)))
-            with open(f'out/enrichr_terms_{species}_{version}.json', 'w') as f:
-                json.dump(results, f)
+        results = []
+        for term, gene_list in tqdm(zip(terms, gene_lists), total=len(terms)):
+            results.append(get_enrichr_labels(term, gene_list))
+        with open(f'out/enrichr_terms_{species}_{version}.json', 'w') as f:
+            json.dump(results, f)

@@ -13,3 +13,5 @@ sentence_transformers
 glasbey
 GEOparse
 biopython
+pyenrichr
+statsmodels

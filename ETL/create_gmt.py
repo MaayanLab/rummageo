@@ -6,7 +6,7 @@ from tqdm import tqdm
 def create_gmt(species: str, version: str):
     num_gs =0
     os.makedirs('out/gmts', exist_ok=True)
-    sig_files = os.listdir(f'data_{species}_{version}')
+    sig_files = os.listdir(f'out/data_{species}_{version}')
     with open(f'out/gmts/{species}-geo-auto_{version}.gmt', 'a') as f:
         for signame in tqdm(list(sig_files)):
             try:

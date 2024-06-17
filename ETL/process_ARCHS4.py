@@ -20,9 +20,9 @@ def get_embeddings(sentences):
 pd.options.mode.chained_assignment = None
 
 def partition_samples(species: str, version: str, base_path: str = ""):
-    if os.path.exists(f'out/gse_groupings_{species}_{version}.json'):
+    if os.path.exists(f'out/partitions/gse_groupings_{species}_{version}.json'):
         return
-    os.makedirs('out', exist_ok=True)
+    os.makedirs('out/partitions', exist_ok=True)
 
     file = f'{base_path}{species}_gene_v{version}.h5'
     single_cell_prob_thresh = 0.5
@@ -102,7 +102,7 @@ def partition_samples(species: str, version: str, base_path: str = ""):
         for label in set(gse_table['label'].values):
             gse_dict[gse][str(label)] = list(grouped_gse_table.get_group(label)['gsm'].values)
 
-    with open(f'out/gse_groupings_{species}_{version}.json', 'w') as fw:
+    with open(f'out/partitions/gse_groupings_{species}_{version}.json', 'w') as fw:
         json.dump(gse_dict, fw)
     
     with open('processed.json', 'w') as fw:

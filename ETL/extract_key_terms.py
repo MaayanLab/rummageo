@@ -239,7 +239,8 @@ def categorize_terms(species, version):
     with open(f'out/keyterms/gse_key_terms_clean_{species}_{version}.json') as f:
         new_keyterms = json.load(f)
 
-    cat_df = pd.read_csv('../data/LLM_keyterm_categories.csv')
+    # manually curated key term categories
+    cat_df = pd.read_csv('https://minio.dev.maayanlab.cloud/rummageo/LLM_keyterm_categories.csv')
 
     terms = set(cat_df['term'].values)
 
@@ -254,6 +255,8 @@ def categorize_terms(species, version):
     return new_categorizations
 
 def generate_key_terms(species, version):
+    
+    os.makedirs('out/keyterms', exist_ok=True)
     with open(f'out/meta/gse_processed_meta_{species}_{version}_conf.json', 'r') as f:
         gse_info_conf = json.load(f)
     gse_list = list(gse_info_conf.keys())
@@ -312,8 +315,3 @@ def generate_key_terms(species, version):
 
     with open(f'out/keyterms/key_terms_categorized_{species}_{version}.json', 'w') as f:
         json.dump(new_categorizations, f, indent=4)
-
-
-generate_key_terms('human', '2.4')
-
-generate_key_terms('mouse', '2.4')

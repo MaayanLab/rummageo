@@ -31,10 +31,10 @@ def log2_normalize(x, offset=1.):
 
 
 def compute_confidence(species: str, version: str, base_path: str = ""):
-    if os.path.exists(f'out/gse_processed_meta_{species}_{version}_conf.json'):
+    if os.path.exists(f'out/meta/gse_processed_meta_{species}_{version}_conf.json'):
         return
     
-    with open(f'out/gse_processed_meta_{species}_{version}.json') as f:
+    with open(f'out/meta/gse_processed_meta_{species}_{version}.json') as f:
         gse_processed_meta = json.load(f)
 
     f = h5.File(f"{base_path}{species}_gene_v{version}.h5", "r")
@@ -94,5 +94,5 @@ def compute_confidence(species: str, version: str, base_path: str = ""):
             print(gse, e)
             gse_processed_meta[gse]['silhouette_score'] = -2
         
-    with open(f'out/gse_processed_meta_{species}_{version}_conf.json', 'w') as f:
+    with open(f'out/meta/gse_processed_meta_{species}_{version}_conf.json', 'w') as f:
         json.dump(gse_processed_meta, f)
