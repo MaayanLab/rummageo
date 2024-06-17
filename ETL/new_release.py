@@ -5,12 +5,13 @@ from calc_confidence import *
 from create_meta_dict import *
 from enrichr_tags import *
 from create_gmt import *
+from make_downloads import *
 
 def new_release(species: str, version: str, base_path: str = ""):
     print("Partitioning new samples for", species, version)
     partition_samples(species, version, base_path)
     print("Computing signatures for", species, version)
-    #run_compute_sigs(species, version, base_path)
+    run_compute_sigs(species, version, base_path)
     print("Creating meta dict for", species, version)
     create_meta_dict(species, version, base_path)
     print("Computing confidence for", species, version)
@@ -19,6 +20,9 @@ def new_release(species: str, version: str, base_path: str = ""):
     create_gmt(species, version)
     print("Computing Enrichr tags for", species, version)
     compute_enrichr_labels(species, version)
+    print("Creating updated download files")
+    make_downloads(species, version)
+
 
 
 if __name__ == '__main__':

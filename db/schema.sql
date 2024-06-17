@@ -219,10 +219,10 @@ CREATE TABLE app_public_v2.background (
 
 
 --
--- Name: indexed_enrich(app_public_v2.background, uuid[], character varying, integer, double precision, double precision, integer, integer, double precision); Type: FUNCTION; Schema: app_private_v2; Owner: -
+-- Name: indexed_enrich(app_public_v2.background, uuid[], character varying, integer, double precision, double precision, integer, integer, double precision, character varying, character varying); Type: FUNCTION; Schema: app_private_v2; Owner: -
 --
 
-CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer) RETURNS app_public_v2.paginated_enrich_result
+CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer, sort_by character varying DEFAULT NULL::character varying, sort_by_dir character varying DEFAULT NULL::character varying) RETURNS app_public_v2.paginated_enrich_result
     LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
     AS $$
   import requests
@@ -232,7 +232,9 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
     overlap_ge=overlap_ge,
     pvalue_le=pvalue_le,
     adj_pvalue_le=adj_pvalue_le,
-    score_filter=filter_score_le
+    score_filter=filter_score_le,
+    sort_by=sort_by,
+    sort_by_dir=sort_by_dir
   )
   if filter_term: params['filter_term'] = filter_term
   if offset: params['offset'] = offset
@@ -355,10 +357,10 @@ $$;
 
 
 --
--- Name: background_enrich(app_public_v2.background, character varying[], character varying, integer, double precision, double precision, integer, integer, double precision); Type: FUNCTION; Schema: app_public_v2; Owner: -
+-- Name: background_enrich(app_public_v2.background, character varying[], character varying, integer, double precision, double precision, integer, integer, double precision, character varying, character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
-CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.background, genes character varying[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer) RETURNS app_public_v2.paginated_enrich_result
+CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.background, genes character varying[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer, sort_by character varying DEFAULT NULL::character varying, sort_by_dir character varying DEFAULT NULL::character varying) RETURNS app_public_v2.paginated_enrich_result
     LANGUAGE sql IMMUTABLE SECURITY DEFINER PARALLEL SAFE
     AS $$
   select r.*
@@ -371,7 +373,9 @@ CREATE FUNCTION app_public_v2.background_enrich(background app_public_v2.backgro
     background_enrich.adj_pvalue_le,
     background_enrich."offset",
     background_enrich."first",
-    background_enrich.filter_score_le
+    background_enrich.filter_score_le,
+    background_enrich.sort_by,
+    background_enrich.sort_by_dir
   ) r;
 $$;
 

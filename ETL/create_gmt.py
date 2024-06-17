@@ -18,22 +18,22 @@ def create_gmt(species: str, version: str):
                 if len(genes_up) > 2000:
                     sig_signif_up = sig_signif[sig_signif['t'] > 0]
                     cutoff = 0.01
-                    i= 2
+                    i = 1
                     while len(genes_up) > 2000:
                         genes_up = sig_signif_up[sig_signif_up['adj.P.Val'] < cutoff].index.values
                         cutoff = 0.05 * 10**(-i)
-                        i+=1
+                        i += 1
 
                 genes_down = sig_signif[sig_signif['t'] < 0].index.values
 
                 if len(genes_down) > 2000:
                     sig_signif_dn = sig_signif[sig_signif['t'] < 0]
                     cutoff = 0.01
-                    i= 2
+                    i = 1
                     while len(genes_down) > 2000:
                         genes_down = sig_signif_dn[sig_signif_dn['adj.P.Val'] < cutoff].index.values
                         cutoff = 0.05 * 10**(-i)
-                        i+=1
+                        i += 1
                 if len(genes_up) >= 5:
                     genes_up_str = '\t'.join(genes_up)
                     f.write(f"{signame.replace('.tsv.gz', '')} up\t\t{genes_up_str}\n")

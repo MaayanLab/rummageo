@@ -123,7 +123,7 @@ export default function TermVis({
     {enrichedTerms ? 
     <div className="flex flex-col w-full">
       <div className="mx-auto min-h-full h-fit w-10/12">
-        <p className="font-light mb-3">Functional term signfigance for the top 5,000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
+        <p className="font-light mb-3">Functional term significance for the top 5,000 unique enriched GSEs. Clicking on a term in the table below will show you enriched signatures in which that term was identified.</p>
         <div className="flex gap-3">
           <button className={classNames("btn btn-outline", {"bg-slate-300": sourceType == 'A'})}
           onClick={() => {

@@ -62,7 +62,7 @@ def import_gene_set_library(
   library: Path | str,
   species: str = 'human',
   prefix='',
-  postfix='',
+  postfix=''
 ):
   import re
   import json
@@ -148,17 +148,25 @@ def import_gse_attrs(plpy, species='human'):
     r['gse']
     for r in plpy.cursor(
       f'''
-        select gse, species
+        select gse
         from app_public_v2.gse_info
         where species = '{species}'
+          and gse not in (
+            select gse
+            from app_public_v2.gse_terms
+            where species = '{species}'
+          )
       '''
     )
   ]
 
   to_ingest = list(set(to_ingest))
   
-  with open(f'data/{species}_keyterm_library_filtered.json') as f:
+  """ with open(f'data/{species}_keyterm_library_filtered.json') as f:
+    gse_attrs = json.load(f) """
+  with open(f'ETL/out/keyterms/gse_key_terms_clean_{species}_2.4.json') as f:
     gse_attrs = json.load(f)
+  
   
 
   for gse in tqdm(to_ingest):
@@ -173,9 +181,9 @@ def import_gse_attrs(plpy, species='human'):
     if gse not in gse_attrs:
       plpy.execute(sql, (gse, [], [], [], species))
     else:
-      llm_attrs = gse_attrs[gse]['LLM']
-      pubmed_attrs = gse_attrs[gse]['PubMed']
-      mesh_attrs = gse_attrs[gse]['MeSH']
+      llm_attrs = gse_attrs[gse]
+      pubmed_attrs = []
+      mesh_attrs = []
       plpy.execute(sql, (gse, llm_attrs, pubmed_attrs, mesh_attrs, species))
 
   #plpy.execute('refresh materialized view app_public_v2.terms_count_combined', [])
@@ -205,13 +213,18 @@ def import_term_categories(plpy):
   import pandas as pd
   from tqdm import tqdm
 
-  df = pd.read_csv('data/LLM_keyterm_categories.csv')
+  with open('ETL/out/keyterms/key_terms_categorized_human_2.4.json') as f:
+    human_cats = json.load(f)
+  with open('ETL/out/keyterms/key_terms_categorized_human_2.4.json') as f:
+    mouse_cats = json.load(f)
+
+  new_cats = human_cats | mouse_cats
 
   copy_from_records(
     plpy.conn, 'app_public_v2.term_categories', ('term_name', 'category',),
     (
-      dict(term_name=row['term'], category=row['manual_category'])
-      for _, row in tqdm(df.iterrows(), desc='Inserting term categories...', total=len(df))
+      dict(term_name=term, category=new_cats[term])
+      for term in tqdm(new_cats, desc='Inserting term categories...', total=len(new_cats))
     ),
   )
 
@@ -223,6 +236,8 @@ def import_gse_info(plpy, species='human'):
   import pandas as pd
   import json
   from datetime import datetime
+
+  plpy.execute('refresh materialized view app_public_v2.gene_set_gse;')
 
   # find subset to add info to
   to_ingest = [
@@ -244,12 +259,14 @@ def import_gse_info(plpy, species='human'):
 
   print(f'Found {len(to_ingest)} new GSEs to ingest')
   # fetch processed gse groupings/conditions titles info
-  if not os.path.exists(f'./ETL/out/gse_info_to_ingest_{species}.json'):
+  if not os.path.exists(f'data/gse_info_to_ingest_{species}.json'):
     try:
-      with open(f'./ETL/out/gse_processed_meta_{species}.json') as f:
+      with open(f'data/{species}-gse-processed-meta.json') as f:
         gse_info = json.load(f)
     except:
-      raise RuntimeError('Please run `python3 ETL/create_meta_dict.py` first for the given species')
+      raise RuntimeError('Missing metadata. Please ensure path is correct.')
+    
+    os.makedirs('data/geo', exist_ok=True)
 
     gse_info_to_ingest = {}
     samples_to_ingest = set()
@@ -261,7 +278,7 @@ def import_gse_info(plpy, species='human'):
         gse_split = gse
       for i in range(10):
         try:
-          geo_meta = GEOparse.GEOparse.get_GEO(geo=gse_split, silent=True, destdir='./ETL/data/geo')
+          geo_meta = GEOparse.GEOparse.get_GEO(geo=gse_split, silent=True, destdir='data/geo')
         except:
           print(f'Failed to fetch {gse}')
           continue
@@ -279,22 +296,23 @@ def import_gse_info(plpy, species='human'):
       gse_info_to_ingest[gse]['publication_date'] = formatted_date  # yyyy-mm-dd
       gse_info_to_ingest[gse]['platform'] = geo_meta.get_metadata_attribute('platform_id')
       gse_info_to_ingest[gse]['species'] = species
-      gse_info_to_ingest[gse]['sample_groups'] = gse_info[gse]
+      gse_info_to_ingest[gse]['sample_groups'] = {"samples": gse_info[gse]['samples'], "titles": gse_info[gse]['titles']}
+      gse_info_to_ingest[gse]['silhouette_score'] = gse_info[gse]['silhouette_score']
 
       samples = list(chain.from_iterable(gse_info[gse]['samples'].values()))
       samples_to_ingest.update(samples)
 
     
-    with open(f'./ETL/out/gse_info_to_ingest_{species}.json', 'w') as f:
+    with open(f'data/gse_info_to_ingest_{species}.json', 'w') as f:
       json.dump(gse_info_to_ingest, f)
     
-    with open(f'./ETL/out/samps_to_ingest_{species}.json', 'w') as f2:
+    with open(f'data/samps_to_ingest_{species}.json', 'w') as f2:
       json.dump(list(samples_to_ingest), f2)
   else:
-    with open(f'./ETL/out/gse_info_to_ingest_{species}.json') as f:
+    with open(f'data/gse_info_to_ingest_{species}.json') as f:
       gse_info_to_ingest = json.load(f)
     
-    with open(f'./ETL/out/samps_to_ingest_{species}.json') as f2:
+    with open(f'data/samps_to_ingest_{species}.json') as f2:
       samples_to_ingest = json.load(f2)
 
 
@@ -309,16 +327,12 @@ def import_gse_info(plpy, species='human'):
   ]
 
 
-  samps_df = pd.read_csv(f'out/gse_gsm_meta_{species}.csv', index_col=0).set_index('gsm')
+  samps_df = pd.read_csv(f'data/gse_gsm_meta_{species}.csv').set_index('gsm')
 
   samples_to_ingest = list(set(samples_to_ingest) - set(gsms_ingested))
   samps_df_to_ingest = samps_df.loc[list(samples_to_ingest)]
 
-  with open(f'data/gse_processed_meta_{species}_conf.json') as f:
-    gse_conf = json.load(f)
 
-
-  
   copy_from_records(
     plpy.conn, 'app_public_v2.gse_info', ('gse', 'pmid', 'title', 'summary', 'published_date', 'species', 'platform', 'sample_groups', 'silhouette_score'),
     tqdm((
@@ -331,7 +345,7 @@ def import_gse_info(plpy, species='human'):
         species=species,
         platform=gse_info_to_ingest[gse]['platform'],
         sample_groups=json.dumps(gse_info_to_ingest[gse]['sample_groups']),
-        silhouette_score=gse_conf[gse]['silhouette_score']
+        silhouette_score=gse_info_to_ingest[gse]['silhouette_score']
       )
       for gse in to_ingest
       if gse in gse_info_to_ingest
@@ -359,108 +373,6 @@ def import_gse_info(plpy, species='human'):
   plpy.execute('refresh materialized view app_public_v2.gene_set_pmid', [])
 
 
-def import_pb_info(plpy):
-  import requests
-  import re
-  from datetime import datetime
-  import ast
-
-  to_ingest = [
-    r['pmid']
-    for r in plpy.cursor(
-      f'''
-        select pmid
-        from app_public_v2.gse_info
-        where gse not in (
-          select pmid
-          from app_public_v2.pmid_info
-        )
-      '''
-    )
-  ]
-
-  to_ingest = list(set(to_ingest))
-
-  to_ingest = [id for id in to_ingest if id is not None]
-
-  # deal with multiple pmids in one entry
-  formated = []
-  for val in to_ingest:
-    if '[' in val:
-      to_ingest.remove(val)
-      parsed_data = ast.literal_eval(val)
-      formated += parsed_data
-    else: formated.append(val)
-  to_ingest = formated
-
-  if os.path.exists('./ETL/out/pb_info_to_ingest.json'):
-    with open('./ETL/out/pb_info_to_ingest.json') as f:
-      pb_info = json.load(f)
-    to_pull = list(set(to_ingest).difference(list(pb_info.keys())))
-  else:
-    pb_info = {}
-
-  for i in tqdm(range(0, len(to_pull), 250), 'Pulling titles...'):
-    for j in range(10):
-      try:
-        ids_string = ",".join(to_pull[i:i+250])
-        res = requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id={ids_string}')
-        ids_info = res.json()
-      except KeyboardInterrupt:
-        raise
-      except Exception as e:
-        traceback.print_exc()
-        print('Error resolving info. Retrying...')
-        continue
-      for id in ids_info['result']['uids']:
-        pb_info[id] = {}
-        try:
-          pb_info[id]['title'] = ids_info['result'][id]['title']
-        except KeyError:
-          pass
-        try:
-          possible_formats = ['%Y %b', '%Y %b %d']
-          for format_str in possible_formats:
-              try:
-                  date_object = datetime.strptime(ids_info['result'][id]['pubdate'], format_str)
-              except ValueError:
-                  pass
-          formatted_date = date_object.strftime("%Y-%m")
-          pb_info[id]['date'] = formatted_date
-        except ValueError:
-          pass
-        try:
-          pb_info[id]['doi']  = next((item['value'] for item in ids_info['result'][id]['articleids'] if item['idtype'] == 'doi'), None)
-        except KeyError:
-          pass
-        try:
-          pb_info[id]['pmcid']  = next((item['value'] for item in ids_info['result'][id]['articleids'] if item['idtype'] == 'pmc'), None)
-        except KeyError:
-          pass  
-      break
-        
-
-  with open('./ETL/out/pb_info_to_ingest.json', 'w') as f:
-    json.dump(pb_info, f)
-
-  
-  copy_from_records(
-    plpy.conn, 'app_public_v2.pmid_info', ('pmid', 'pmcid', 'title', 'pub_date', 'doi'),
-    tqdm((
-      dict(
-        pmid=pmid,
-        pmcid=pb_info[pmid]['pmcid'],
-        title=pb_info[pmid]['title'],
-        pub_date=pb_info[pmid]['date'],
-        doi=pb_info[pmid]['doi'],
-      )
-      for pmid in to_ingest
-      if pmid in pb_info
-    ),
-    total=len(to_ingest),
-    desc='Inserting new PubMed entries...'),
-  )
-
 def replace_infinity_with_none(obj):
     import math
     if isinstance(obj, float) and math.isinf(obj):
@@ -476,8 +388,18 @@ def import_enrichr_terms(plpy, species='human'):
   import json
   from tqdm import tqdm
 
-  with open(f'data/enrichr_terms_{species}.json') as f:
+  with open(f'data/enrichr-terms-{species}.json') as f:
     enrichr_terms = json.load(f)
+
+  enrichr_terms_ingested = set([
+    r['sig']
+    for r in plpy.cursor(
+      f'''
+        select sig
+        from app_public_v2.enrichr_terms
+      '''
+    )
+  ])
 
   for sig in tqdm(enrichr_terms):
     sql = """
@@ -488,6 +410,8 @@ def import_enrichr_terms(plpy, species='human'):
         enrichr_stats = EXCLUDED.enrichr_stats;
         """
     sig_name = list(sig.keys())[0]
+    if sig_name in enrichr_terms_ingested:
+      continue
     enrichr_stats=json.dumps(replace_infinity_with_none(sig[list(sig.keys())[0]]))
 
     sig_terms = []
@@ -529,33 +453,6 @@ def ingest_gse_info(species):
     plpy.conn.commit()
 
 @cli.command()
-def fix_mouse_terms():
-  from plpy import plpy
-  try:
-    from tqdm import tqdm
-    terms = [
-    (r['id'], r['term'])
-      for r in plpy.cursor(
-        f'''
-          SELECT id, term FROM app_public_v2.gene_set WHERE species = 'mouse';
-        '''
-      )
-    ]
-
-    # Update each term
-    for term in tqdm(terms):
-        # Remove the '.tsv' extension from the term
-        id = term[0]
-        new_term = term[1].replace('.tsv', '')
-        # Execute the UPDATE query
-        plpy.execute("UPDATE app_public_v2.gene_set SET term = %s WHERE id = %s;", (new_term, id))
-  except:
-    plpy.conn.rollback()
-    raise
-  else:
-    plpy.conn.commit()
-
-@cli.command()
 @click.option('--species', type=str, default='human', help='Terms species')
 def ingest_enrichr_terms(species):
   from plpy import plpy
@@ -590,27 +487,6 @@ def ingest_term_categories():
   else:
     plpy.conn.commit()
 
-@cli.command()
-def ingest_pb_info():
-  from plpy import plpy
-  try:
-    import_pb_info(plpy)
-  except Exception as e:
-    plpy.conn.rollback()
-    raise e
-  else:
-    plpy.conn.commit()
-
-@cli.command()
-@click.argument('publications', type=int)
-def create_release(publications):
-  from plpy import plpy
-  plpy.execute(
-    plpy.prepare('insert into app_public_v2.release (n_publications_processed) values ($1);', ['bigint']),
-    [publications],
-  )
-  plpy.execute('refresh materialized view app_private_v2.pmc_stats;')
-  plpy.conn.commit()
 
 @cli.command()
 @click.option('--enrich-url', envvar='ENRICH_URL', default='http://127.0.0.1:8000')
