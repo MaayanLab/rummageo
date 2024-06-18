@@ -17,39 +17,39 @@ export default function Download() {
         Gene set libraries are available for download in GMT format. Accompanying metadata is available in JSON format which contains gene set condition titles and GSM ids.
       </p>
       <div className="grid lg:grid-cols-2 gap-4 my-4">
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/human_12-04-2023.gmt.gz" download="human-geo-auto.gmt.gz">
+        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/human-geo-auto.gmt.gz" download="human-geo-auto.gmt.gz">
           <div className="stat gap-2">
             <div className="stat-title">human-geo-auto.gmt.gz</div>
-            <div className="stat-value text-xl">135,264 gene sets</div>
+            <div className="stat-value text-xl">171,524 gene sets</div>
             <div className="stat-desc whitespace-normal">
-            <span className="whitespace-nowrap">386MB compressed</span>, <span className="whitespace-nowrap">874MB uncompressed</span>, <span className="whitespace-nowrap">Last Updated Fri Dec 8 2023</span>
+            <span className="whitespace-nowrap">511MB compressed</span>, <span className="whitespace-nowrap">1.1G uncompressed</span>, <span className="whitespace-nowrap">Last Updated Tue June 18 2024</span>
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/gse_processed_meta_human.json" download="geo_processed_meta_human.json">
+        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/human-gse-processed-meta.json" download="human-gse-processed-meta.json">
           <div className="stat gap-2">
-            <div className="stat-title">geo_processed_meta_human.json</div>
+            <div className="stat-title">human-gse-processed-meta.json</div>
             <div className="stat-value text-xl">human metadata</div>
             <div className="stat-desc whitespace-normal">
-              <span className="whitespace-nowrap">11.7MB uncompressed</span>, <span className="whitespace-nowrap">Last Updated Fri Dec 8 2023</span>
+              <span className="whitespace-nowrap">16.2MB uncompressed</span>, <span className="whitespace-nowrap">Last Updated Tue June 18 2024</span>
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/mouse_12-04-2023.gmt.gz" download="mouse-geo-auto.gmt.gz">
+        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/mouse-geo-auto.gmt.gz" download="mouse-geo-auto.gmt.gz">
           <div className="stat gap-2">
             <div className="stat-title">mouse-geo-auto.gmt.gz</div>
-            <div className="stat-value text-xl">158,062 gene sets</div>
+            <div className="stat-value text-xl">195,265 gene sets</div>
             <div className="stat-desc whitespace-normal">
-              <span className="whitespace-nowrap">418MB compressed</span>, <span className="whitespace-nowrap">878MB uncompressed</span>, <span className="whitespace-nowrap">Last Updated Fri Dec 8 2023</span>
+              <span className="whitespace-nowrap">512MB compressed</span>, <span className="whitespace-nowrap">1.1G uncompressed</span>, <span className="whitespace-nowrap">Last Updated Tue June 18 2024</span>
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/gse_processed_meta_mouse.json" download="gse_processed_meta_mouse.json">
+        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/mouse-gse-processed-meta.json" download="mouse-gse-processed-meta.json">
           <div className="stat gap-2">
-            <div className="stat-title">gse_processed_meta_mouse.json</div>
+            <div className="stat-title">mouse-gse-processed-meta.json</div>
             <div className="stat-value text-xl">mouse metadata</div>
             <div className="stat-desc whitespace-normal">
-              <span className="whitespace-nowrap">13.6MB</span>, <span className="whitespace-nowrap">Last Updated Fri Dec 8 2023</span>
+              <span className="whitespace-nowrap">13.6MB</span>, <span className="whitespace-nowrap">Last Updated Tue June 18 2024</span>
             </div>
           </div>
         </a>
