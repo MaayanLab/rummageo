@@ -225,6 +225,7 @@ CREATE TABLE app_public_v2.background (
 CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.background, gene_ids uuid[], filter_term character varying DEFAULT NULL::character varying, overlap_ge integer DEFAULT 1, pvalue_le double precision DEFAULT 0.05, adj_pvalue_le double precision DEFAULT 0.05, "offset" integer DEFAULT NULL::integer, first integer DEFAULT NULL::integer, filter_score_le double precision DEFAULT '-1'::integer, sort_by character varying DEFAULT NULL::character varying, sort_by_dir character varying DEFAULT NULL::character varying) RETURNS app_public_v2.paginated_enrich_result
     LANGUAGE plpython3u IMMUTABLE PARALLEL SAFE
     AS $$
+  import os
   import requests
   import json
 
@@ -240,7 +241,7 @@ CREATE FUNCTION app_private_v2.indexed_enrich(background app_public_v2.backgroun
   if offset: params['offset'] = offset
   if first: params['limit'] = first
   req = requests.post(
-    f"http://rummageo-enrich:8000/{background['id']}",
+    f"{os.environ.get('ENRICH_URL', 'http://rummageo-enrich:8000')}/{background['id']}",
     params=params,
     json=gene_ids,
   )
