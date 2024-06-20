@@ -13,7 +13,7 @@ services:
       - DATABASE_URL=postgres://postgres:4d767b6d084d896eefff4564b40611de@172.17.0.1:5432/postgres?sslmode=disable
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
       - NODE_ENV=production
-      - ENRICH_URL=http://rummageo-enrich:8000
+      - ENRICH_URL=http://rummageo-enrich-2:8000
       - NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
       - OPENAI_API_KEY=$OPENAI_API_KEY
     ports:
@@ -26,9 +26,20 @@ services:
   rummageo-enrich:
     platform: linux/amd64
     build: enrich
-    image: maayanlab/rummageo-enrich:0.1.4
+    image: maayanlab/rummageo-enrich:0.1.3
     environment:
       - 'ROCKET_DATABASES={postgres={url="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@rummageo-postgres/${POSTGRES_DB}"}}'
+    ports:
+      - 8000:8000
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+
+  rummageo-enrich-2:
+    platform: linux/amd64
+    build: enrich
+    image: maayanlab/rummageo-enrich:0.1.4
+    environment:
+      - 'ROCKET_DATABASES={postgres={url="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@rummageo-postgres-2/${POSTGRES_DB}"}}'
     ports:
       - 8000:8000
     x-kubernetes:
@@ -49,9 +60,29 @@ services:
     x-kubernetes:
       imagePullPolicy: IfNotPresent
 
+  rummageo-postgres-2:
+    platform: linux/amd64
+    build: db
+    image: maayanlab/rummageo-postgres:0.0.4
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - ENRICH_URL=http://rummageo-enrich-2:8000
+    ports:
+      - 5432
+    volumes:
+      - rummageo-data-2:/var/lib/postgresql/data
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+
 volumes:
   rummageo-data:
     x-kubernetes:
       size: 20Gi
       class: gp2
 
+  rummageo-data-2:
+    x-kubernetes:
+      size: 20Gi
+      class: gp2
