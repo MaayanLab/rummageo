@@ -10,7 +10,7 @@ services:
     build: .
     image: maayanlab/rummageo:0.0.10
     environment:
-      - DATABASE_URL=$DATABASE_URL
+      - DATABASE_URL=postgres://postgres:4d767b6d084d896eefff4564b40611de@172.17.0.1:5432/postgres?sslmode=disable
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
       - NODE_ENV=production
       - ENRICH_URL=http://rummageo-enrich:8000

@@ -32,9 +32,7 @@ npm run dev
 
 ### Provisioning
 ```bash
-python ./bot/helper.py ingest -i your-gmt.gmt
-python ./bot/helper.py ingest-gse-info
-python ./bot/helper.py ingest-pb-info
+make ingest-db
 ```
 
 ### Writing Queries

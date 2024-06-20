@@ -46,3 +46,5 @@ def make_downloads():
                 enrichr_tags_dict_combined.extend(json.load(fd))
         with open(f'out/downloads/enrichr-terms-{species}.json','w') as wfd:
             json.dump(enrichr_tags_dict_combined, wfd)
+    
+make_downloads()

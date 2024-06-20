@@ -162,12 +162,8 @@ def import_gse_attrs(plpy, species='human'):
 
   to_ingest = list(set(to_ingest))
   
-  """ with open(f'data/{species}_keyterm_library_filtered.json') as f:
-    gse_attrs = json.load(f) """
-  with open(f'ETL/out/keyterms/gse_key_terms_clean_{species}_2.4.json') as f:
+  with open(f'data/keyterms_{species}.json') as f:
     gse_attrs = json.load(f)
-  
-  
 
   for gse in tqdm(to_ingest):
     sql = """
@@ -213,12 +209,8 @@ def import_term_categories(plpy):
   import pandas as pd
   from tqdm import tqdm
 
-  with open('ETL/out/keyterms/key_terms_categorized_human_2.4.json') as f:
-    human_cats = json.load(f)
-  with open('ETL/out/keyterms/key_terms_categorized_human_2.4.json') as f:
-    mouse_cats = json.load(f)
-
-  new_cats = human_cats | mouse_cats
+  with open('data/keyterms_categorized.json') as f:
+    new_cats = json.load(f)
 
   copy_from_records(
     plpy.conn, 'app_public_v2.term_categories', ('term_name', 'category',),
@@ -228,6 +220,8 @@ def import_term_categories(plpy):
     ),
   )
 
+  plpy.execute('refresh materialized view app_public_v2.terms_count_combined;', [])
+  plpy.execute('refresh materialized view app_public_v2.category_total_count;', [])
 
 def import_gse_info(plpy, species='human'):
   import GEOparse
@@ -371,6 +365,7 @@ def import_gse_info(plpy, species='human'):
   )
 
   plpy.execute('refresh materialized view app_public_v2.gene_set_pmid', [])
+  plpy.execute('refresh materialized view app_public_v2.gene_set_gse;', [])
 
 
 def replace_infinity_with_none(obj):
