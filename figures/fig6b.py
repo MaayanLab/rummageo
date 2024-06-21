@@ -312,25 +312,19 @@ lib = "GWAS_Catalog_2023"
 
 with open(f'fig6/{lib}_terms_A.json', 'r') as file:
     gwas_results = json.load(file)
-    
-gwas_enriched_terms = {}
-for key, terms in gwas_results.items():
-    gwas_enriched_terms[key] = [r['term'] for r in terms]
-counts = Counter([term for termlist in gwas_enriched_terms.values() for term in termlist])
-df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
-
-# Filter noisy terms
-#thresh = np.percentile(df_counts['Count'], 90)
-#common_terms = [term for term, count in counts.items() if count >= thresh]
-with open('data/filters/common_terms.txt', 'r') as file: common_terms = file.readlines()
-gwas_results = {k: list(filter(lambda r: r['term'] not in common_terms, terms)) for k, terms in gwas_results.items()}
 
 adj_pvals = []
 for key, terms in gwas_results.items():
     gwas_enriched_terms[key] = [r['term'] for r in terms]
     adj_pvals.extend([r['adjPvalue'] for r in terms])
-counts = Counter([term for termlist in gwas_enriched_terms.values() for term in termlist])
-df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
+
+# Filter noisy terms
+#counts = Counter([term for termlist in gwas_enriched_terms.values() for term in termlist])
+#df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
+#thresh = np.percentile(df_counts['Count'], 90)
+#common_terms = [term for term, count in counts.items() if count >= thresh]
+with open('data/filters/common_terms.txt', 'r') as file: common_terms = file.readlines()
+gwas_results = {k: list(filter(lambda r: r['term'] not in common_terms, terms)) for k, terms in gwas_results.items()}
 
 keys = list(gwas_results.keys())
 enriched_terms = list(df_counts['Term'])
@@ -360,9 +354,8 @@ for key, res in gwas_results.items():
                 count += 1
             if similarities[random_i, j] > 0.95:
                 rand_count += 1
-        if count > 0:
-            gwas_counts.append(count)
-            shuffled_counts.append(rand_count)
+        gwas_counts.append(count)
+        shuffled_counts.append(rand_count)
 
 #### Add L1000 dexamethasone results ####
 dex_roots = ["dexamethasone", "betamethasone", "prednisolone", "cortiso", "steroid", "nr3c1", "nr0b1", "nr1i2", "annexin", "anxa1", "interleukin", "il10", "il 10", "il1\u03bab", "il6", "il 6", "notch", "nitric oxide synthase", "nos2", "glucocortico", "corticotrop", "anti inflamm", "arthritis", "immunosuppress", "tumor necrosis factor alpha", "tumor necrosis factor \u03b1", "tnf", "tnf \u03b1", "mip2", "mip", "glutathione"]
@@ -373,23 +366,17 @@ with open(f'fig6/dexL1000_terms_B.json', 'r') as file:
 with open(f'fig6/randomL1000_terms_B.json', 'r') as file:
     random_sig = json.load(file)
 
-dex_enriched_terms = {}
-for key, terms in dex.items():
-    dex_enriched_terms[key] = [r['term'] for r in terms]
-counts = Counter([term for termlist in dex_enriched_terms.values() for term in termlist])
-df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
-
-# Filter common terms
-#thresh = np.percentile(df_counts['Count'], 75)
-#common_terms = [term for term, count in counts.items() if count >= thresh]
-dex = {k: list(filter(lambda r: r['term'] not in common_terms, terms)) for k, terms in dex.items()}
-
 adj_pvals = []
 for key, terms in dex.items():
     dex_enriched_terms[key] = [r['term'] for r in terms]
     adj_pvals.extend([r['adjPvalue'] for r in terms])
-counts = Counter([term for termlist in dex_enriched_terms.values() for term in termlist])
-df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
+
+# Filter common terms
+#counts = Counter([term for termlist in dex_enriched_terms.values() for term in termlist])
+#df_counts = pd.DataFrame(counts.items(), columns=['Term', 'Count'])
+#thresh = np.percentile(df_counts['Count'], 75)
+#common_terms = [term for term, count in counts.items() if count >= thresh]
+dex = {k: list(filter(lambda r: r['term'] not in common_terms, terms)) for k, terms in dex.items()}
 
 pval_thresh = np.percentile(adj_pvals, 25)
 
@@ -403,9 +390,8 @@ for key, res in dex.items():
         dex_terms = [s for s in terms if any(root in s for root in dex_roots)]
         random_terms = [s for s in random_terms if any(root in s for root in dex_roots)]
         count = len(dex_terms)
-        if count > 0:
-            dex_counts.append(count)
-            random_sig_counts.append(len(random_terms))
+        dex_counts.append(count)
+        random_sig_counts.append(len(random_terms))
 
 
 #### Plot ####
