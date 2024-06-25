@@ -74,7 +74,7 @@ data/keyterm_categories.json:
 	curl -s -o data/keyterm_categories.json https://minio.dev.maayanlab.cloud/rummageo/keyterm_categories_2.4.json
 
 .PHONY: ingest-db
-.ingest-db: data/human-geo-auto.gmt data/mouse-geo-auto.gmt data/human-gse-processed-meta.json data/mouse-gse-processed-meta.json data/enrichr-terms-mouse.json data/enrichr-terms-human.json data/gse_gsm_meta_human.csv data/gse_gsm_meta_mouse.csv data/keyterms_human.json data/keyterms_mouse.json data/keyterm_categories.json
+ingest-db: data/human-geo-auto.gmt data/mouse-geo-auto.gmt data/human-gse-processed-meta.json data/mouse-gse-processed-meta.json data/enrichr-terms-mouse.json data/enrichr-terms-human.json data/gse_gsm_meta_human.csv data/gse_gsm_meta_mouse.csv data/keyterms_human.json data/keyterms_mouse.json data/keyterm_categories.json
 	$(PYTHON) ETL/helper.py ingest -i data/human-geo-auto.gmt --species human
 	$(PYTHON) ETL/helper.py ingest -i data/mouse-geo-auto.gmt --species mouse
 	$(PYTHON) ETL/helper.py ingest-gse-info --species human

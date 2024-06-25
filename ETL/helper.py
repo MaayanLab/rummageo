@@ -324,7 +324,7 @@ def import_gse_info(plpy, species='human'):
   samps_df = pd.read_csv(f'data/gse_gsm_meta_{species}.csv').set_index('gsm')
 
   samples_to_ingest = list(set(samples_to_ingest) - set(gsms_ingested))
-  samps_df_to_ingest = samps_df.loc[list(samples_to_ingest)]
+  samps_df_to_ingest = samps_df.loc[list(set(samples_to_ingest).intersection(samps_df.index))]
 
 
   copy_from_records(
