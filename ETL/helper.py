@@ -209,7 +209,7 @@ def import_term_categories(plpy):
   import pandas as pd
   from tqdm import tqdm
 
-  with open('data/keyterms_categorized.json') as f:
+  with open('data/keyterm_categories.json') as f:
     new_cats = json.load(f)
 
   copy_from_records(

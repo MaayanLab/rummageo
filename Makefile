@@ -71,7 +71,7 @@ data/keyterms_mouse.json:
 
 data/keyterm_categories.json:
 	echo "Downloading keyterm_categories.json"
-	curl -s -o data/keyterm_categories.json https://minio.dev.maayanlab.cloud/rummageo/keyterm_categories_2.4.json
+	curl -s -o data/keyterm_categories.json https://minio.dev.maayanlab.cloud/rummageo/keyterms_categorized_2.4.json
 
 .PHONY: ingest-db
 ingest-db: data/human-geo-auto.gmt data/mouse-geo-auto.gmt data/human-gse-processed-meta.json data/mouse-gse-processed-meta.json data/enrichr-terms-mouse.json data/enrichr-terms-human.json data/gse_gsm_meta_human.csv data/gse_gsm_meta_mouse.csv data/keyterms_human.json data/keyterms_mouse.json data/keyterm_categories.json
@@ -84,4 +84,5 @@ ingest-db: data/human-geo-auto.gmt data/mouse-geo-auto.gmt data/human-gse-proces
 	$(PYTHON) ETL/helper.py ingest-term-categories
 	$(PYTHON) ETL/helper.py ingest-enrichr-terms --species human
 	$(PYTHON) ETL/helper.py ingest-enrichr-terms --species mouse
-
+	$(PYTHON) ETL/helper.py update-background --species human
+	$(PYTHON) ETL/helper.py update-background --species mouse
