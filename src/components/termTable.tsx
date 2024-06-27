@@ -89,6 +89,7 @@ export default function TermTable({
       ></SamplesModal>
       <div className="m-5 mt-1">
         <div className="join flex flex-row place-content-end items-center pt-3 pr-3">
+          <div className="mr-12"><p className='mt-0'>Show results for only <a onClick={() => setQueryString({ page: "1", f: "human" })}>human</a> or <a onClick={() => setQueryString({ page: "1", f: "mouse" })}>mouse</a></p></div>
           <span className="label-text text-base mr-2">Search:</span>
           <input
             type="text"
