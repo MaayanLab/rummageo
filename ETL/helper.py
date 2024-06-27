@@ -225,23 +225,26 @@ def import_pb_info(plpy):
   with open('data/pb_info_to_ingest.json', 'w') as f:
     json.dump(pb_info, f)
 
+  already_ingested = [
+    r['pmid']
+    for r in plpy.cursor(
+      f'''
+        select pmid
+        from app_public_v2.pmid_info;
+      '''
+    )
+  ]
 
-  copy_from_records(
-    plpy.conn, 'app_public_v2.pmid_info', ('pmid', 'pmcid', 'title', 'pub_date', 'doi'),
-    tqdm((
-      dict(
-        pmid=pmid,
-        pmcid=pb_info[pmid]['pmcid'],
-        title=pb_info[pmid]['title'],
-        pub_date=pb_info[pmid]['date'],
-        doi=pb_info[pmid]['doi'],
+  for pmid in tqdm(to_ingest):
+    if pmid in pb_info and pmid not in already_ingested:
+      plpy.execute(
+        '''
+          insert into app_public_v2.pmid_info (pmid, pmcid, title, pub_date, doi)
+          values (%s, %s, %s, %s, %s)
+          on conflict (pmid) do nothing;
+        ''',
+        (pmid, pb_info[pmid]['pmcid'], pb_info[pmid]['title'], pb_info[pmid]['date'], pb_info[pmid]['doi'])
       )
-      for pmid in to_ingest
-      if pmid in pb_info
-    ),
-    total=len(to_ingest),
-    desc='Inserting new PubMed entries...'),
-  )
 
 def import_gse_attrs(plpy, species='human'):
   import json
