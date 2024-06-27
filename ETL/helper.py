@@ -140,6 +140,109 @@ def import_gene_set_library(
     desc='Inserting new genesets...'),
   )
 
+def import_pb_info(plpy):
+  import requests
+  import re
+  from datetime import datetime
+  import ast
+
+  to_ingest = [
+    r['pmid']
+    for r in plpy.cursor(
+      f'''
+        select pmid
+        from app_public_v2.gse_info
+        where gse not in (
+          select pmid
+          from app_public_v2.pmid_info
+        )
+      '''
+    )
+  ]
+
+  to_ingest = list(set(to_ingest))
+
+  to_ingest = [id for id in to_ingest if id is not None]
+
+  # deal with multiple pmids in one entry
+  formated = []
+  for val in to_ingest:
+    if '[' in val:
+      to_ingest.remove(val)
+      parsed_data = ast.literal_eval(val)
+      formated += parsed_data
+    else: formated.append(val)
+  to_ingest = formated
+
+  if os.path.exists('data/pb_info_to_ingest.json'):
+    with open('data/pb_info_to_ingest.json') as f:
+      pb_info = json.load(f)
+    to_pull = list(set(to_ingest).difference(list(pb_info.keys())))
+  else:
+    pb_info = {}
+    to_pull = to_ingest
+
+  for i in tqdm(range(0, len(to_pull), 250), 'Pulling titles...'):
+    for j in range(10):
+      try:
+        ids_string = ",".join(to_pull[i:i+250])
+        res = requests.get(f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id={ids_string}')
+        ids_info = res.json()
+      except KeyboardInterrupt:
+        raise
+      except Exception as e:
+        traceback.print_exc()
+        print('Error resolving info. Retrying...')
+        continue
+      for id in ids_info['result']['uids']:
+        pb_info[id] = {}
+        try:
+          pb_info[id]['title'] = ids_info['result'][id]['title']
+        except KeyError:
+          pass
+        try:
+          possible_formats = ['%Y %b', '%Y %b %d']
+          for format_str in possible_formats:
+              try:
+                  date_object = datetime.strptime(ids_info['result'][id]['pubdate'], format_str)
+              except ValueError:
+                  pass
+          formatted_date = date_object.strftime("%Y-%m")
+          pb_info[id]['date'] = formatted_date
+        except ValueError:
+          pass
+        try:
+          pb_info[id]['doi']  = next((item['value'] for item in ids_info['result'][id]['articleids'] if item['idtype'] == 'doi'), None)
+        except KeyError:
+          pass
+        try:
+          pb_info[id]['pmcid']  = next((item['value'] for item in ids_info['result'][id]['articleids'] if item['idtype'] == 'pmc'), None)
+        except KeyError:
+          pass  
+      break
+
+
+  with open('data/pb_info_to_ingest.json', 'w') as f:
+    json.dump(pb_info, f)
+
+
+  copy_from_records(
+    plpy.conn, 'app_public_v2.pmid_info', ('pmid', 'pmcid', 'title', 'pub_date', 'doi'),
+    tqdm((
+      dict(
+        pmid=pmid,
+        pmcid=pb_info[pmid]['pmcid'],
+        title=pb_info[pmid]['title'],
+        pub_date=pb_info[pmid]['date'],
+        doi=pb_info[pmid]['doi'],
+      )
+      for pmid in to_ingest
+      if pmid in pb_info
+    ),
+    total=len(to_ingest),
+    desc='Inserting new PubMed entries...'),
+  )
+
 def import_gse_attrs(plpy, species='human'):
   import json
   from tqdm import tqdm
@@ -465,6 +568,17 @@ def ingest_gse_attrs(species):
   from plpy import plpy
   try:
     import_gse_attrs(plpy, species)
+  except:
+    plpy.conn.rollback()
+    raise
+  else:
+    plpy.conn.commit()
+
+@cli.command()
+def ingest_pb_info():
+  from plpy import plpy
+  try:
+    import_pb_info(plpy)
   except:
     plpy.conn.rollback()
     raise

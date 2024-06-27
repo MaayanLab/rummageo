@@ -81,6 +81,7 @@ ingest-db: data/human-geo-auto.gmt data/mouse-geo-auto.gmt data/human-gse-proces
 	$(PYTHON) ETL/helper.py ingest-gse-info --species mouse
 	$(PYTHON) ETL/helper.py ingest-gse-attrs --species human
 	$(PYTHON) ETL/helper.py ingest-gse-attrs --species mouse
+	$(PYTHON) ETL/helper.py ingest-pb-info
 	$(PYTHON) ETL/helper.py ingest-term-categories
 	$(PYTHON) ETL/helper.py ingest-enrichr-terms --species human
 	$(PYTHON) ETL/helper.py ingest-enrichr-terms --species mouse
