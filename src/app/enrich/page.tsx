@@ -106,7 +106,7 @@ function EnrichmentResults({
     }),
     [queryString]
   );
-  const { data: enrichmentResults, refetch } = useEnrichmentQueryQuery({
+  const { data: enrichmentResults, refetch, error } = useEnrichmentQueryQuery({
     skip: genes.length === 0,
     variables: {
       genes,
@@ -119,6 +119,8 @@ function EnrichmentResults({
       sortByDir: sortByDir,
     },
   });
+
+  console.log(enrichmentResults)
 
   React.useEffect(() => {
     setRawTerm(term);
@@ -161,6 +163,10 @@ function EnrichmentResults({
       setQueryString({page: "1", q: term, sortByDir: sortByDir, sortBy: sortByCol});
       refetch({sortByDir:sortByDir, sortBy: sortByCol})
     } 
+  }
+
+  if (error) {
+    return <div className="m-5">No valid genes identified.</div>
   }
 
   return (
