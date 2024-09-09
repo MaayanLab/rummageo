@@ -565,6 +565,67 @@ $$;
 
 
 --
+-- Name: gse_info; Type: TABLE; Schema: app_public_v2; Owner: -
+--
+
+CREATE TABLE app_public_v2.gse_info (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    gse character varying,
+    pmid character varying,
+    title character varying,
+    summary character varying,
+    published_date date,
+    species character varying,
+    platform character varying,
+    sample_groups jsonb,
+    silhouette_score double precision,
+    gse_attrs character varying
+);
+
+
+--
+-- Name: gene_set_pmid; Type: MATERIALIZED VIEW; Schema: app_public_v2; Owner: -
+--
+
+CREATE MATERIALIZED VIEW app_public_v2.gene_set_pmid AS
+ SELECT gs.id,
+    gs.term,
+    gse_info.id AS gse_id,
+    gse_info.gse,
+    gse_info.pmid,
+    gse_info.title,
+    gse_info.sample_groups,
+    gse_info.platform,
+    gse_info.published_date,
+    gse_info.gse_attrs,
+    gse_info.silhouette_score
+   FROM (app_public_v2.gene_set gs
+     JOIN app_public_v2.gse_info gse_info ON ((regexp_replace((gs.term)::text, '\mGSE([^-]+)\M.*'::text, 'GSE\1'::text) = (gse_info.gse)::text)))
+  WITH NO DATA;
+
+
+--
+-- Name: MATERIALIZED VIEW gene_set_pmid; Type: COMMENT; Schema: app_public_v2; Owner: -
+--
+
+COMMENT ON MATERIALIZED VIEW app_public_v2.gene_set_pmid IS '@foreignKey (id) references app_public_v2.gene_set (id)';
+
+
+--
+-- Name: gene_set_term_search(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.gene_set_term_search(terms character varying[]) RETURNS SETOF app_public_v2.gene_set_pmid
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select distinct gs.*
+  from app_public_v2.gene_set_pmid gs
+  inner join unnest(terms) ut(term) on gs.title ilike ('%' || ut.term || '%')
+  or gs.term ilike ('%' || ut.term || '%')
+$$;
+
+
+--
 -- Name: gsm_meta; Type: TABLE; Schema: app_public_v2; Owner: -
 --
 
@@ -588,6 +649,19 @@ CREATE FUNCTION app_public_v2.get_gsm_meta(gsms character varying[]) RETURNS SET
   select *
   from app_public_v2.gsm_meta
   where gsm = ANY (gsms);
+$$;
+
+
+--
+-- Name: get_pb_info_by_ids(character varying[]); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.get_pb_info_by_ids(pmids character varying[]) RETURNS SETOF app_public_v2.gene_set_pmid
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select *
+  from app_public_v2.gene_set_pmid
+  where pmid = ANY(pmids)
 $$;
 
 
@@ -865,25 +939,6 @@ COMMENT ON VIEW app_public_v2.gse IS '@foreignKey (gse) references app_public_v2
 
 
 --
--- Name: gse_info; Type: TABLE; Schema: app_public_v2; Owner: -
---
-
-CREATE TABLE app_public_v2.gse_info (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    gse character varying,
-    pmid character varying,
-    title character varying,
-    summary character varying,
-    published_date date,
-    species character varying,
-    platform character varying,
-    sample_groups jsonb,
-    silhouette_score double precision,
-    gse_attrs character varying
-);
-
-
---
 -- Name: pmc; Type: VIEW; Schema: app_public_v2; Owner: -
 --
 
@@ -897,6 +952,19 @@ CREATE VIEW app_public_v2.pmc AS
 --
 
 COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2.gene_set_pmc (pmc)';
+
+
+--
+-- Name: gene_set_pmid_titles; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.gene_set_pmid_titles AS
+ SELECT gs.id,
+    string_agg(kv.value, ' '::text) AS concatenated_titles
+   FROM app_public_v2.gene_set_pmid gs,
+    LATERAL jsonb_each_text((gs.sample_groups -> 'titles'::text)) kv(key, value)
+  GROUP BY gs.id
+  WITH NO DATA;
 
 
 --
@@ -1109,6 +1177,20 @@ CREATE INDEX gene_set_pmc_pmc_idx ON app_public_v2.gene_set_pmc USING btree (pmc
 
 
 --
+-- Name: gene_set_pmid_id_idx; Type: INDEX; Schema: app_public_v2; Owner: -
+--
+
+CREATE INDEX gene_set_pmid_id_idx ON app_public_v2.gene_set_pmid USING btree (id);
+
+
+--
+-- Name: gene_set_pmid_pmid_idx; Type: INDEX; Schema: app_public_v2; Owner: -
+--
+
+CREATE INDEX gene_set_pmid_pmid_idx ON app_public_v2.gene_set_pmid USING btree (pmid);
+
+
+--
 -- Name: gene_set_term_idx; Type: INDEX; Schema: app_public_v2; Owner: -
 --
 
@@ -1148,6 +1230,13 @@ CREATE INDEX pmid_info_pmid_idx ON app_public_v2.pmid_info USING btree (pmid);
 --
 
 CREATE INDEX release_created_idx ON app_public_v2.release USING btree (created);
+
+
+--
+-- Name: idx_gene_set_pmid_titles_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_gene_set_pmid_titles_trgm ON public.gene_set_pmid_titles USING gist (concatenated_titles public.gist_trgm_ops);
 
 
 --
@@ -1195,4 +1284,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20240403141754'),
     ('20240403160325'),
     ('20240610183415'),
-    ('20240620201839');
+    ('20240620201839'),
+    ('20240722191825');
