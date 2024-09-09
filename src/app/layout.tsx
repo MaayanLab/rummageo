@@ -65,7 +65,7 @@ export default function RootLayout({
               </React.Suspense>
             </main>
             <footer className="flex-none footer p-5 mt-5 bg-neutral-900  bg-opacity-40 text-neutral-content flex place-content-evenly">
-              <div className="text-center pt-5">
+              <div className="text-center pt-6">
                 <ul>
                   <li><Link href="mailto:avi.maayan@mssm.edu" target="_blank">Contact Us</Link></li>
                   <li>
@@ -89,14 +89,10 @@ export default function RootLayout({
                 </Link>
                 </p>
               </div>
-              <div className="text-center pt-5">
-                <ul>
-                  <li>
-                    <Link href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">
-                      <Image src="/images/cc-by-nc-sa.png" alt="CC-by-NC-SA" width={117} height={41} />
+              <div className="text-center pt-10">
+                    <Link href="https://spdx.org/licenses/BSD-Source-Code.html" target="_blank">
+                      BSD Source Code Attribution
                     </Link>
-                  </li>
-                </ul>
               </div> 
             </footer>
             <Analytics />
