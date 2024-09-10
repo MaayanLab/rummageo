@@ -8,7 +8,7 @@ services:
   rummageo-app:
     platform: linux/amd64
     build: .
-    image: maayanlab/rummageo:0.0.11
+    image: maayanlab/rummageo:0.0.12
     environment:
       - DATABASE_URL=postgres://postgres:4d767b6d084d896eefff4564b40611de@172.17.0.1:5432/postgres?sslmode=disable
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
