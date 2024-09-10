@@ -89,11 +89,6 @@ export default function RootLayout({
                 </Link>
                 </p>
               </div>
-              <div className="text-center pt-10">
-                    <Link href="https://spdx.org/licenses/BSD-Source-Code.html" target="_blank">
-                      BSD Source Code Attribution
-                    </Link>
-              </div> 
             </footer>
             <Analytics />
           </body>

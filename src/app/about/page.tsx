@@ -125,16 +125,67 @@ export default function About() {
             following reference:
           </p>
           <p>
-            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi Ma&apos;ayan.
-            RummaGEO: Automatic Mining of Human and Mouse Gene Sets from GEO. 
+            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi
+            Ma&apos;ayan. RummaGEO: Automatic Mining of Human and Mouse Gene
+            Sets from GEO.
           </p>
           <p>
             <Link
               className="underline cursor"
               href={"https://doi.org/10.1101/2024.04.09.588712"}
               target="_blank"
-            >bioRxiv 2024.04.09.588712</Link>
+            >
+              bioRxiv 2024.04.09.588712
+            </Link>
           </p>
+          <br />
+          <p>
+            RummaGEO is protected under the &quot;BSD Source Code Attribution&quot;
+            license (see below).
+          </p>
+            <br />
+          <p>
+            <b>
+              Copyright (c) 2024, Ma&apos;ayan Lab, Icahn School of Medicine at
+              Mount Sinai
+            </b>
+          </p>
+          <p className="font-bold">
+            All rights reserved.
+          </p>
+          <br />
+          <p className="font-bold">Redistribution and use of this software in
+          source and binary forms, with or without modification, are permitted
+          provided that the following conditions are met:</p>
+          <br />
+          <p className="font-bold">
+          * Redistributions of source code must retain the above copyright notice, this list of
+          conditions and the following disclaimer.
+          </p>
+          <p className="font-bold">
+          * Neither the name of
+            &quot;Ma&apos;ayan Lab, Icahn School of Medicine at Mount Sinai&quot; nor the names
+            of its contributors may be used to endorse or promote products
+            derived from this software without specific prior written permission
+            from Ma&apos;ayan Lab, Icahn School of Medicine at Mount Sinai.
+          </p>
+          <br />
+          <p className="font-bold">
+               
+          THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS
+            IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+            LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+            FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+            COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+            INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+            BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+            LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+            CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+            LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+            ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+            POSSIBILITY OF SUCH DAMAGE.
+            </p>
+          
         </div>
       </div>
     </div>
