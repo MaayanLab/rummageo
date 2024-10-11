@@ -125,17 +125,15 @@ export default function About() {
             following reference:
           </p>
           <p>
-            Giacomo B. Marino, Daniel J. B. Clarke, Eden Z. Deng, Avi
-            Ma&apos;ayan. RummaGEO: Automatic Mining of Human and Mouse Gene
-            Sets from GEO.
+           Marino, G.B., Clarke, D.J.B., Lachmann, A., Deng, E.Z., and Ma’ayan, A. (2024). RummaGEO: Automatic mining of human and mouse gene sets from GEO. Patterns 5.
           </p>
           <p>
             <Link
               className="underline cursor"
-              href={"https://doi.org/10.1101/2024.04.09.588712"}
+              href={"https://www.cell.com/patterns/fulltext/S2666-3899(24)00231-9"}
               target="_blank"
             >
-              bioRxiv 2024.04.09.588712
+              10.1016/j.patter.2024.101072.
             </Link>
           </p>
           <br />
