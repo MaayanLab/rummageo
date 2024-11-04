@@ -246,7 +246,7 @@ def import_pb_info(plpy):
         (pmid, pb_info[pmid]['pmcid'], pb_info[pmid]['title'], pb_info[pmid]['date'], pb_info[pmid]['doi'])
       )
 
-def import_gse_attrs(plpy, species='human'):
+def import_gse_attrs(plpy, species='human', path=None):
   import json
   from tqdm import tqdm
 
@@ -268,8 +268,12 @@ def import_gse_attrs(plpy, species='human'):
 
   to_ingest = list(set(to_ingest))
   
-  with open(f'data/keyterms_{species}.json') as f:
-    gse_attrs = json.load(f)
+  if path:
+    with open(path) as f:
+      gse_attrs = json.load(f)
+  else:
+    with open(f'data/keyterms_{species}.json') as f:
+      gse_attrs = json.load(f)
 
   for gse in tqdm(to_ingest):
     sql = """
@@ -311,25 +315,38 @@ def import_gse_attrs(plpy, species='human'):
                   WHERE  gi.gse = gt.gse and gi.species = gt.species;""", [])
 
 
-def import_term_categories(plpy):
+def import_term_categories(plpy, path):
   import pandas as pd
   from tqdm import tqdm
-
-  with open('data/keyterm_categories.json') as f:
-    new_cats = json.load(f)
+  if path:
+    with open(path) as f:
+      new_cats = json.load(f)
+  else:
+    with open('data/keyterm_categories.json') as f:
+      new_cats = json.load(f)
+      
+  already_ingested = [
+    r['term_name']
+    for r in plpy.cursor(
+      f'''
+        select term_name from app_public_v2.term_categories;
+      '''
+    )
+  ]
 
   copy_from_records(
     plpy.conn, 'app_public_v2.term_categories', ('term_name', 'category',),
     (
       dict(term_name=term, category=new_cats[term])
       for term in tqdm(new_cats, desc='Inserting term categories...', total=len(new_cats))
+      if term not in already_ingested
     ),
   )
 
   plpy.execute('refresh materialized view app_public_v2.terms_count_combined;', [])
   plpy.execute('refresh materialized view app_public_v2.category_total_count;', [])
 
-def import_gse_info(plpy, species='human'):
+def import_gse_info(plpy, species='human', path=None):
   import GEOparse
   from itertools import chain
   from tqdm import tqdm
@@ -359,12 +376,21 @@ def import_gse_info(plpy, species='human'):
 
   print(f'Found {len(to_ingest)} new GSEs to ingest')
   # fetch processed gse groupings/conditions titles info
-  if not os.path.exists(f'data/gse_info_to_ingest_{species}.json'):
-    try:
-      with open(f'data/{species}-gse-processed-meta.json') as f:
-        gse_info = json.load(f)
-    except:
-      raise RuntimeError('Missing metadata. Please ensure path is correct.')
+  if not os.path.exists(f'data/gse_info_to_ingest_{species}.json') and not path:
+    if path:
+      try:
+        with open(path) as f:
+          gse_info = json.load(f)
+      except:
+        raise RuntimeError('Missing metadata. Please ensure path is correct.')
+      
+    else:
+      if not os.path.exists(f'data/gse_info_to_ingest_{species}.json'):
+        try:
+          with open(f'data/{species}-gse-processed-meta.json') as f:
+            gse_info = json.load(f)
+        except:
+          raise RuntimeError('Missing metadata. Please ensure path is correct.')
     
     os.makedirs('data/geo', exist_ok=True)
 
@@ -485,12 +511,15 @@ def replace_infinity_with_none(obj):
     else:
         return obj
 
-def import_enrichr_terms(plpy, species='human'):
+def import_enrichr_terms(plpy, species='human', path=None):
   import json
   from tqdm import tqdm
-
-  with open(f'data/enrichr-terms-{species}.json') as f:
-    enrichr_terms = json.load(f)
+  if path:
+    with open(path) as f:
+      enrichr_terms = json.load(f)
+  else:
+    with open(f'data/enrichr-terms-{species}.json') as f:
+      enrichr_terms = json.load(f)
 
   enrichr_terms_ingested = set([
     r['sig']
@@ -543,10 +572,11 @@ def ingest(input, prefix, postfix, species):
 
 @cli.command()
 @click.option('--species', type=str, default='human', help='Terms species')
-def ingest_gse_info(species):
+@click.option('--path', type=str, default=None, help='Terms species')
+def ingest_gse_info(species, path):
   from plpy import plpy
   try:
-    import_gse_info(plpy, species)
+    import_gse_info(plpy, species, path)
   except:
     plpy.conn.rollback()
     raise
@@ -555,10 +585,11 @@ def ingest_gse_info(species):
 
 @cli.command()
 @click.option('--species', type=str, default='human', help='Terms species')
-def ingest_enrichr_terms(species):
+@click.option('--path', type=str, default=None, help='Path to enrichr terms JSON')
+def ingest_enrichr_terms(species, path):
   from plpy import plpy
   try:
-    import_enrichr_terms(plpy, species)
+    import_enrichr_terms(plpy, species, path)
   except:
     plpy.conn.rollback()
     raise
@@ -567,10 +598,11 @@ def ingest_enrichr_terms(species):
 
 @cli.command()
 @click.option('--species', type=str, default='human', help='Terms species')
-def ingest_gse_attrs(species):
+@click.option('--path', type=str, default=None, help='Path to attributes JSON')
+def ingest_gse_attrs(species, path):
   from plpy import plpy
   try:
-    import_gse_attrs(plpy, species)
+    import_gse_attrs(plpy, species, path)
   except:
     plpy.conn.rollback()
     raise
@@ -589,10 +621,11 @@ def ingest_pb_info():
     plpy.conn.commit()
 
 @cli.command()
-def ingest_term_categories():
+@click.option('--path', type=str, default=None, help='Path to JSON with categorizations to ingest')
+def ingest_term_categories(path):
   from plpy import plpy
   try:
-    import_term_categories(plpy)
+    import_term_categories(plpy, path)
   except:
     plpy.conn.rollback()
     raise
