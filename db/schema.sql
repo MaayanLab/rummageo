@@ -340,6 +340,13 @@ CREATE TABLE app_public_v2.user_gene_set (
 
 
 --
+-- Name: TABLE user_gene_set; Type: COMMENT; Schema: app_public_v2; Owner: -
+--
+
+COMMENT ON TABLE app_public_v2.user_gene_set IS '@omit all';
+
+
+--
 -- Name: add_user_gene_set(character varying[], character varying); Type: FUNCTION; Schema: app_public_v2; Owner: -
 --
 
@@ -773,6 +780,18 @@ $$;
 
 
 --
+-- Name: user_gene_set_count(); Type: FUNCTION; Schema: app_public_v2; Owner: -
+--
+
+CREATE FUNCTION app_public_v2.user_gene_set_count() RETURNS integer
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select count(*) as total_count
+  from app_public_v2.user_gene_set;
+$$;
+
+
+--
 -- Name: notify_watchers_ddl(); Type: FUNCTION; Schema: postgraphile_watch; Owner: -
 --
 
@@ -952,19 +971,6 @@ CREATE VIEW app_public_v2.pmc AS
 --
 
 COMMENT ON VIEW app_public_v2.pmc IS '@foreignKey (pmc) references app_public_v2.gene_set_pmc (pmc)';
-
-
---
--- Name: gene_set_pmid_titles; Type: MATERIALIZED VIEW; Schema: public; Owner: -
---
-
-CREATE MATERIALIZED VIEW public.gene_set_pmid_titles AS
- SELECT gs.id,
-    string_agg(kv.value, ' '::text) AS concatenated_titles
-   FROM app_public_v2.gene_set_pmid gs,
-    LATERAL jsonb_each_text((gs.sample_groups -> 'titles'::text)) kv(key, value)
-  GROUP BY gs.id
-  WITH NO DATA;
 
 
 --
@@ -1233,13 +1239,6 @@ CREATE INDEX release_created_idx ON app_public_v2.release USING btree (created);
 
 
 --
--- Name: idx_gene_set_pmid_titles_trgm; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_gene_set_pmid_titles_trgm ON public.gene_set_pmid_titles USING gist (concatenated_titles public.gist_trgm_ops);
-
-
---
 -- Name: postgraphile_watch_ddl; Type: EVENT TRIGGER; Schema: -; Owner: -
 --
 
@@ -1285,4 +1284,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20240403160325'),
     ('20240610183415'),
     ('20240620201839'),
-    ('20240722191825');
+    ('20240722191825'),
+    ('20241104153031');

@@ -1,6 +1,7 @@
 query Stats {
-  userGeneSets {
-    totalCount
+  userGeneSetCount
+    geneSets {
+      totalCount
   }
   humanGeneSets: geneSets(condition: {species: "human"}) {
     totalCount

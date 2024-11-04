@@ -28,7 +28,7 @@ export default function Stats({
   } else if (show_gses){
     return (data?.gses?.totalCount !== undefined ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.gses.totalCount)}</span>&nbsp;GEO studies</> : <span className='loading'>loading</span>)
   } else if (show_sets_analyzed) {
-    return (data?.userGeneSets?.totalCount !== undefined ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.userGeneSets.totalCount)}</span>&nbsp;sets analyzed</> : <span className='loading'>loading</span>)
+    return (data?.userGeneSetCount ? <><span className={classNames({'font-bold': bold})}>{Intl.NumberFormat("en-US", {}).format(data.userGeneSetCount)}</span>&nbsp;sets analyzed</> : <span className='loading'>loading</span>)
   } else{
     return null
   }
