@@ -90,6 +90,7 @@ function EnrichmentResults({
   backgrounds?.backgrounds?.nodes?.forEach((background) => {
     backgroundIds[background?.species ?? ""] = background?.id ?? "";
   });
+  
   const [queryString, setQueryString] = useQsState({ page: "1", q: "", sortBy: "pvalue", sortByDir: "asc"});
   const [rawTerm, setRawTerm] = React.useState("");
   const [enrichedTerms, setEnrichedTerms] = React.useState<(string | null)[]>();
@@ -663,13 +664,11 @@ function EnrichmentResults({
                                     type: "GeneSetOverlap",
                                     id: enrichmentResult?.geneSet?.id,
                                     description:
-                                      `${gse}: ${cond1Title} vs. ${cond1Title} ${dir}` ??
-                                      "",
+                                      `${gse}: ${cond1Title} vs. ${cond1Title} ${dir}`,
                                     genes,
                                     gseId:
                                       enrichmentResult?.geneSet
-                                        ?.geneSetPmidsById.nodes[0]?.gseId ??
-                                      "",
+                                        ?.geneSetPmidsById.nodes[0]?.gseId,
                                   });
                                 }}
                               >
