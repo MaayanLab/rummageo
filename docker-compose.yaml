@@ -10,7 +10,7 @@ services:
     build: .
     image: maayanlab/rummageo:0.1.0
     environment:
-      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@rummageo-postgres-2/postgres?sslmode=disable
+      - DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@rummageo-postgres-3/postgres
       - AUTHORIZATION_HEADER=$AUTHORIZATION_HEADER
       - NODE_ENV=production
       - ENRICH_URL=http://rummageo-enrich-2:8000
@@ -45,22 +45,6 @@ services:
     x-kubernetes:
       imagePullPolicy: IfNotPresent
 
-  rummageo-postgres:
-    platform: linux/amd64
-    build: db
-    image: maayanlab/rummageo-postgres:0.0.4
-    environment:
-      - POSTGRES_DB
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - ENRICH_URL=http://rummageo-enrich:8000
-    ports:
-      - 5432:5432
-    volumes:
-      - rummageo-data:/var/lib/postgresql/data
-    x-kubernetes:
-      imagePullPolicy: IfNotPresent
-
   rummageo-postgres-2:
     platform: linux/amd64
     build: db
@@ -77,13 +61,29 @@ services:
     x-kubernetes:
       imagePullPolicy: IfNotPresent
 
+  rummageo-postgres-3:
+    platform: linux/amd64
+    build: db
+    image: maayanlab/rummageo-postgres:0.0.4
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - ENRICH_URL=http://rummageo-enrich:8000
+    ports:
+      - 5432
+    volumes:
+      - rummageo-data-3:/var/lib/postgresql/data
+    x-kubernetes:
+      imagePullPolicy: IfNotPresent
+
 volumes:
-  rummageo-data:
+  rummageo-data-2:
     x-kubernetes:
       size: 20Gi
       class: gp2
 
-  rummageo-data-2:
+  rummageo-data-3:
     x-kubernetes:
-      size: 20Gi
+      size: 30Gi
       class: gp2
