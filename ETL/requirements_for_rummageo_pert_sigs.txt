@@ -1,0 +1,5 @@
+pandas
+requests
+drug_named_entity_recognition
+git+https://github.com/Maayanlab/maayanlab-bioinformatics.git
+obonet
