@@ -3,6 +3,8 @@ import React from 'react'
 import Stats from "@/app/stats";
 import { useLatestReleaseQuery } from "@/graphql";
 
+const prefix = 'https://minio.dev.maayanlab.cloud'
+
 export default function Download() {
   const { data } = useLatestReleaseQuery()
   const latest_release_date = React.useMemo(() => {
@@ -17,7 +19,7 @@ export default function Download() {
         Gene set libraries are available for download in GMT format. Accompanying metadata is available in JSON format which contains gene set condition titles and GSM ids.
       </p>
       <div className="grid lg:grid-cols-2 gap-4 my-4">
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/2.5/human-geo-auto.gmt.gz" download="human-geo-auto.gmt.gz">
+        <a className="stats shadow" href={`${prefix}/rummageo/2.5/human-geo-auto.gmt.gz`} download="human-geo-auto.gmt.gz">
           <div className="stat gap-2">
             <div className="stat-title">human-geo-auto.gmt.gz</div>
             <div className="stat-value text-xl">178,975 gene sets</div>
@@ -26,7 +28,7 @@ export default function Download() {
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/2.5/human-gse-processed-meta.json" download="human-gse-processed-meta.json">
+        <a className="stats shadow" href={`${prefix}/rummageo/2.5/human-gse-processed-meta.json`} download="human-gse-processed-meta.json">
           <div className="stat gap-2">
             <div className="stat-title">human-gse-processed-meta.json</div>
             <div className="stat-value text-xl">human metadata</div>
@@ -35,7 +37,7 @@ export default function Download() {
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/2.5/mouse-geo-auto.gmt.gz" download="mouse-geo-auto.gmt.gz">
+        <a className="stats shadow" href={`${prefix}/rummageo/2.5/mouse-geo-auto.gmt.gz`} download="mouse-geo-auto.gmt.gz">
           <div className="stat gap-2">
             <div className="stat-title">mouse-geo-auto.gmt.gz</div>
             <div className="stat-value text-xl">203,427 gene sets</div>
@@ -44,7 +46,7 @@ export default function Download() {
             </div>
           </div>
         </a>
-        <a className="stats shadow" href="https://s3.amazonaws.com/maayanlab-public/rummageo/2.5/mouse-gse-processed-meta.json" download="mouse-gse-processed-meta.json">
+        <a className="stats shadow" href={`${prefix}/rummageo/2.5/mouse-gse-processed-meta.json`} download="mouse-gse-processed-meta.json">
           <div className="stat gap-2">
             <div className="stat-title">mouse-gse-processed-meta.json</div>
             <div className="stat-value text-xl">mouse metadata</div>
