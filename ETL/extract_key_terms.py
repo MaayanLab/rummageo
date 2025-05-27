@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import requests
 from transformers import AutoTokenizer
+from huggingface_hub import login
 import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
@@ -29,6 +30,8 @@ os.makedirs('out/keyterms', exist_ok=True)
 
 API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
 api_token = os.getenv('HF_API_KEY') # Get yours at hf.co/settings/tokens
+
+login(token=api_token)
 # Log into huggingface using huggingface-cli login
 headers = {"Authorization": f"Bearer {api_token}"} 
 

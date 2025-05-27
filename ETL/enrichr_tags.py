@@ -59,5 +59,5 @@ def compute_enrichr_labels(species: str, version: str):
         results = []
         for term, gene_list in tqdm(zip(terms, gene_lists), total=len(terms)):
             results.append(get_enrichr_labels(term, gene_list))
-        with open(f'out/enrichr_terms_{species}_{version}.json', 'w') as f:
+        with open(f'out/enrichr/enrichr_terms_{species}_{version}.json', 'w') as f:
             json.dump(results, f)

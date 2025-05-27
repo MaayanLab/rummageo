@@ -35,7 +35,7 @@ def make_downloads():
         meta_dict_combined = {}
         for f in species_metas:
             with open(f'out/meta/{f}','rb') as fd:
-                meta_dict_combined = meta_dict_combined | json.load(fd)
+                meta_dict_combined = {**meta_dict_combined, **json.load(fd)}
         with open(f'out/downloads/{species}-gse-processed-meta.json','w') as wfd:
             json.dump(meta_dict_combined, wfd)
 
@@ -46,5 +46,3 @@ def make_downloads():
                 enrichr_tags_dict_combined.extend(json.load(fd))
         with open(f'out/downloads/enrichr-terms-{species}.json','w') as wfd:
             json.dump(enrichr_tags_dict_combined, wfd)
-    
-make_downloads()

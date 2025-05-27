@@ -10,7 +10,7 @@ def create_gmt(species: str, version: str):
     with open(f'out/gmts/{species}-geo-auto_{version}.gmt', 'a') as f:
         for signame in tqdm(list(sig_files)):
             try:
-                sig = pd.read_csv(f'data_{species}_{version}/{signame}', index_col=0, sep='\t', compression='gzip')
+                sig = pd.read_csv(f'out/data_{species}_{version}/{signame}', index_col=0, sep='\t', compression='gzip')
                 sig_signif = sig[sig['adj.P.Val'] < .05]
 
                 genes_up = sig_signif[sig_signif['t'] > 0].index.values
@@ -45,6 +45,6 @@ def create_gmt(species: str, version: str):
                     num_gs+=1
                 #else: print(sig_signif, len(genes_down), genes_down)
             except Exception as e:
-                print(sig, e)
+                print(signame, e)
 
     print("Exported", num_gs, "gene sets.")
